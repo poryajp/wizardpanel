@@ -1074,7 +1074,7 @@ function showPlansForCategoryAndServer($chat_id, $category_id, $server_id) {
     $message = "🛍️ <b>پلن‌های سرور «{$server_name}»</b>\nموجودی شما: " . number_format($user_balance) . " تومان\n\nلطفا پلن مورد نظر خود را انتخاب کنید:";
     $keyboard_buttons = [];
     foreach ($active_plans as $plan) {
-        $button_text = "{$plan['name']} | {$plan['volume_gb']}GB | " . number_format($plan['price']) . " تومان";
+        $button_text = "{$plan['name']} | " . number_format($plan['price']) . " تومان | {$plan['volume_gb']} GB";
         $keyboard_buttons[] = [['text' => $button_text, 'callback_data' => "buy_plan_{$plan['id']}"]];
     }
     // فرمت callback جدید برای کد تخفیف: apply_discount_code_{cat_ID}_{srv_ID}
@@ -1247,7 +1247,7 @@ function completePurchase($user_id, $plan_id, $custom_name, $final_price, $disco
     $first_name = $user_data['first_name'];
 
     // ساخت نام کاربری کامل و یکتا برای پنل
-    $plan['full_username'] = preg_replace('/[^a-zA-Z0-9_.]/', '', $custom_name) . '_user' . $user_id . '_' . time();
+    $plan['full_username'] = $user_id . '_' . rand(10, 99);
 
 
     $panel_user_data = createPanelUser($plan, $user_id, $plan_id);
