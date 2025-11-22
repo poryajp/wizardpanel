@@ -8,7 +8,7 @@ if (php_sapi_name() !== 'cli') {
 require_once __DIR__ . '/includes/config.php';
 require_once __DIR__ . '/includes/db.php';
 require_once __DIR__ . '/includes/functions.php';
-require_once __DIR__ . '/includes/marzban_api.php';
+require_once __DIR__ . '/api/marzban_api.php';
 
 echo "Cron job started at " . date('Y-m-d H:i:s') . "\n";
 
