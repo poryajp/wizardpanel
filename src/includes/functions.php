@@ -10,7 +10,8 @@ require_once __DIR__ . '/../api/marzneshin_api.php';
 // =====================================================================
 
 
-function handleKeyboard($keyboard, $handleMainMenu = false) {
+function handleKeyboard($keyboard, $handleMainMenu = false)
+{
 
     if (USER_INLINE_KEYBOARD) {
         if (is_null($keyboard)) {
@@ -24,8 +25,7 @@ function handleKeyboard($keyboard, $handleMainMenu = false) {
                     ]
                 ]
             ];
-        }
-        else {
+        } else {
             if (isset($keyboard['keyboard'])) {
                 $keyboard = convertToInlineKeyboard($keyboard);
             }
@@ -42,13 +42,13 @@ function handleKeyboard($keyboard, $handleMainMenu = false) {
 
     if (is_null($keyboard)) {
         return null;
-    }
-    else {
+    } else {
         return json_encode($keyboard);
     }
 }
 
-function convertToInlineKeyboard($keyboard) {
+function convertToInlineKeyboard($keyboard)
+{
     $inlineKeyboard = [];
 
     if (isset($keyboard['keyboard'])) {
@@ -66,15 +66,15 @@ function convertToInlineKeyboard($keyboard) {
                 $inlineKeyboard[] = $inlineRow;
             }
         }
-    }
-    else {
+    } else {
         return null;
     }
 
     return ['inline_keyboard' => $inlineKeyboard];
 }
 
-function array_str_contains(array $array, string|array $needle): bool {
+function array_str_contains(array $array, string|array $needle): bool
+{
     if (is_array($needle)) {
         foreach ($needle as $n) {
             if (array_str_contains($array, $n)) {
@@ -89,15 +89,15 @@ function array_str_contains(array $array, string|array $needle): bool {
             if (array_str_contains($item, $needle)) {
                 return true;
             }
-        }
-        elseif (is_string($item) && stripos($item, $needle) !== false) {
+        } elseif (is_string($item) && stripos($item, $needle) !== false) {
             return true;
         }
     }
     return false;
 }
 
-function sendMessage($chat_id, $text, $keyboard = null, $handleMainMenu = false) {
+function sendMessage($chat_id, $text, $keyboard = null, $handleMainMenu = false)
+{
     $params = ['chat_id' => $chat_id, 'text' => $text, 'reply_markup' => handleKeyboard($keyboard, $handleMainMenu), 'parse_mode' => 'HTML'];
 
     global $update, $oneTimeEdit;
@@ -111,51 +111,56 @@ function sendMessage($chat_id, $text, $keyboard = null, $handleMainMenu = false)
             return apiRequest('sendMessage', $params);
         }
         return $result;
-    }
-    else {
+    } else {
         return apiRequest('sendMessage', $params);
     }
 }
 
-function forwardMessage($to_chat_id, $from_chat_id, $message_id) {
+function forwardMessage($to_chat_id, $from_chat_id, $message_id)
+{
     $params = ['chat_id' => $to_chat_id, 'from_chat_id' => $from_chat_id, 'message_id' => $message_id];
     return apiRequest('forwardMessage', $params);
 }
 
-function sendPhoto($chat_id, $photo, $caption, $keyboard = null) {
+function sendPhoto($chat_id, $photo, $caption, $keyboard = null)
+{
     $params = ['chat_id' => $chat_id, 'photo' => $photo, 'caption' => $caption, 'reply_markup' => handleKeyboard($keyboard), 'parse_mode' => 'HTML'];
     return apiRequest('sendPhoto', $params);
 }
 
-function editMessageText($chat_id, $message_id, $text, $keyboard = null) {
+function editMessageText($chat_id, $message_id, $text, $keyboard = null)
+{
     $params = ['chat_id' => $chat_id, 'message_id' => $message_id, 'text' => $text, 'reply_markup' => handleKeyboard($keyboard), 'parse_mode' => 'HTML'];
 
     global $oneTimeEdit;
     if (USER_INLINE_KEYBOARD && $oneTimeEdit) {
         $oneTimeEdit = false;
         return apiRequest('editMessageText', $params);
-    }
-    else {
-    
+    } else {
+
         unset($params['message_id']);
         return apiRequest('sendMessage', $params);
     }
 }
 
-function editMessageCaption($chat_id, $message_id, $caption, $keyboard = null) {
+function editMessageCaption($chat_id, $message_id, $caption, $keyboard = null)
+{
     $params = ['chat_id' => $chat_id, 'message_id' => $message_id, 'caption' => $caption, 'reply_markup' => handleKeyboard($keyboard), 'parse_mode' => 'HTML'];
     return apiRequest('editMessageCaption', $params);
 }
 
-function deleteMessage($chat_id, $message_id) {
+function deleteMessage($chat_id, $message_id)
+{
     global $update, $oneTimeEdit;
-    if (USER_INLINE_KEYBOARD && !$oneTimeEdit && isset($update['callback_query']['message']['message_id']) && $update['callback_query']['message']['message_id'] == $message_id) return false;
+    if (USER_INLINE_KEYBOARD && !$oneTimeEdit && isset($update['callback_query']['message']['message_id']) && $update['callback_query']['message']['message_id'] == $message_id)
+        return false;
 
     $params = ['chat_id' => $chat_id, 'message_id' => $message_id];
     return apiRequest('deleteMessage', $params);
 }
 
-function apiRequest($method, $params = []) {
+function apiRequest($method, $params = [])
+{
     global $apiRequest;
     $apiRequest = true;
 
@@ -180,7 +185,8 @@ function apiRequest($method, $params = []) {
 // =====================================================================
 
 // --- مدیریت کاربران ---
-function getUserData($chat_id, $first_name = 'کاربر') {
+function getUserData($chat_id, $first_name = 'کاربر')
+{
     pdo()
         ->prepare("UPDATE users SET last_seen_at = CURRENT_TIMESTAMP, reminder_sent = 0 WHERE chat_id = ?")
         ->execute([$chat_id]);
@@ -191,7 +197,7 @@ function getUserData($chat_id, $first_name = 'کاربر') {
 
     if (!$user) {
         $settings = getSettings();
-        $welcome_gift = (int)($settings['welcome_gift_balance'] ?? 0);
+        $welcome_gift = (int) ($settings['welcome_gift_balance'] ?? 0);
 
         $stmt = pdo()->prepare("INSERT INTO users (chat_id, first_name, balance, user_state) VALUES (?, ?, ?, 'main_menu')");
         $stmt->execute([$chat_id, $first_name, $welcome_gift]);
@@ -211,47 +217,53 @@ function getUserData($chat_id, $first_name = 'کاربر') {
     return $user;
 }
 
-function updateUserData($chat_id, $state, $data = []) {
+function updateUserData($chat_id, $state, $data = [])
+{
     $state_data_json = json_encode($data, JSON_UNESCAPED_UNICODE);
     $stmt = pdo()->prepare("UPDATE users SET user_state = ?, state_data = ? WHERE chat_id = ?");
     $stmt->execute([$state, $state_data_json, $chat_id]);
 }
 
-function updateUserBalance($chat_id, $amount, $operation = 'add') {
+function updateUserBalance($chat_id, $amount, $operation = 'add')
+{
     if ($operation == 'add') {
         $stmt = pdo()->prepare("UPDATE users SET balance = balance + ? WHERE chat_id = ?");
-    }
-    else {
+    } else {
         $stmt = pdo()->prepare("UPDATE users SET balance = balance - ? WHERE chat_id = ?");
     }
     $stmt->execute([$amount, $chat_id]);
 }
 
-function setUserStatus($chat_id, $status) {
+function setUserStatus($chat_id, $status)
+{
     $stmt = pdo()->prepare("UPDATE users SET status = ? WHERE chat_id = ?");
     $stmt->execute([$status, $chat_id]);
 }
 
-function getAllUsers() {
+function getAllUsers()
+{
     return pdo()
         ->query("SELECT chat_id FROM users WHERE status = 'active'")
         ->fetchAll(PDO::FETCH_COLUMN);
 }
 
-function increaseAllUsersBalance($amount) {
+function increaseAllUsersBalance($amount)
+{
     $stmt = pdo()->prepare("UPDATE users SET balance = balance + ? WHERE status = 'active'");
     $stmt->execute([$amount]);
     return $stmt->rowCount();
 }
 
-function resetAllUsersTestCount() {
+function resetAllUsersTestCount()
+{
     $stmt = pdo()->prepare("UPDATE users SET test_config_count = 0");
     $stmt->execute();
     return $stmt->rowCount();
 }
 
 // --- مدیریت ادمین‌ها ---
-function getAdmins() {
+function getAdmins()
+{
     $stmt = pdo()->prepare("SELECT * FROM admins WHERE is_super_admin = 0");
     $stmt->execute();
     $admins_from_db = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -265,22 +277,26 @@ function getAdmins() {
     return $admins;
 }
 
-function addAdmin($chat_id, $first_name) {
+function addAdmin($chat_id, $first_name, $permissions = [])
+{
     $stmt = pdo()->prepare("INSERT INTO admins (chat_id, first_name, permissions, is_super_admin) VALUES (?, ?, ?, ?)");
-    return $stmt->execute([$chat_id, $first_name, json_encode([]), 0]);
+    return $stmt->execute([$chat_id, $first_name, json_encode($permissions), 0]);
 }
 
-function removeAdmin($chat_id) {
+function removeAdmin($chat_id)
+{
     $stmt = pdo()->prepare("DELETE FROM admins WHERE chat_id = ? AND is_super_admin = 0");
     return $stmt->execute([$chat_id]);
 }
 
-function updateAdminPermissions($chat_id, $permissions) {
+function updateAdminPermissions($chat_id, $permissions)
+{
     $stmt = pdo()->prepare("UPDATE admins SET permissions = ? WHERE chat_id = ?");
     return $stmt->execute([json_encode($permissions), $chat_id]);
 }
 
-function isUserAdmin($chat_id) {
+function isUserAdmin($chat_id)
+{
     if ($chat_id == ADMIN_CHAT_ID) {
         return true;
     }
@@ -289,7 +305,8 @@ function isUserAdmin($chat_id) {
     return $stmt->fetchColumn() > 0;
 }
 
-function hasPermission($chat_id, $permission) {
+function hasPermission($chat_id, $permission)
+{
     if ($chat_id == ADMIN_CHAT_ID) {
         return true;
     }
@@ -306,7 +323,8 @@ function hasPermission($chat_id, $permission) {
 }
 
 // --- مدیریت تنظیمات ---
-function getSettings() {
+function getSettings()
+{
     $stmt = pdo()->query("SELECT * FROM settings");
     $settings_from_db = $stmt->fetchAll(PDO::FETCH_KEY_PAIR);
 
@@ -342,7 +360,8 @@ function getSettings() {
     return $settings_from_db;
 }
 
-function saveSettings($settings) {
+function saveSettings($settings)
+{
     foreach ($settings as $key => $value) {
         if (is_array($value)) {
             $value = json_encode($value, JSON_UNESCAPED_UNICODE);
@@ -353,7 +372,8 @@ function saveSettings($settings) {
 }
 
 // --- مدیریت دسته‌بندی‌ها، پلن‌ها و سرویس‌ها ---
-function getCategories($only_active = false) {
+function getCategories($only_active = false)
+{
     $sql = "SELECT * FROM categories";
     if ($only_active) {
         $sql .= " WHERE status = 'active'";
@@ -363,31 +383,36 @@ function getCategories($only_active = false) {
         ->fetchAll(PDO::FETCH_ASSOC);
 }
 
-function getPlans() {
+function getPlans()
+{
     return pdo()
         ->query("SELECT * FROM plans WHERE is_test_plan = 0")
         ->fetchAll(PDO::FETCH_ASSOC);
 }
 
-function getPlansForCategory($category_id) {
+function getPlansForCategory($category_id)
+{
     $stmt = pdo()->prepare("SELECT * FROM plans WHERE category_id = ? AND status = 'active' AND is_test_plan = 0");
     $stmt->execute([$category_id]);
     return $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 
-function getPlanById($plan_id) {
+function getPlanById($plan_id)
+{
     $stmt = pdo()->prepare("SELECT * FROM plans WHERE id = ?");
     $stmt->execute([$plan_id]);
     return $stmt->fetch(PDO::FETCH_ASSOC);
 }
 
-function getTestPlan() {
+function getTestPlan()
+{
     return pdo()
         ->query("SELECT * FROM plans WHERE is_test_plan = 1 AND status = 'active' LIMIT 1")
         ->fetch(PDO::FETCH_ASSOC);
 }
 
-function getUserServices($chat_id) {
+function getUserServices($chat_id)
+{
     $stmt = pdo()->prepare("
         SELECT s.*, p.name as plan_name 
         FROM services s
@@ -399,12 +424,14 @@ function getUserServices($chat_id) {
     return $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 
-function saveUserService($chat_id, $serviceData) {
+function saveUserService($chat_id, $serviceData)
+{
     $stmt = pdo()->prepare("INSERT INTO services (owner_chat_id, server_id, marzban_username, custom_name, plan_id, sub_url, expire_timestamp, volume_gb) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
     $stmt->execute([$chat_id, $serviceData['server_id'], $serviceData['username'], $serviceData['custom_name'], $serviceData['plan_id'], $serviceData['sub_url'], $serviceData['expire_timestamp'], $serviceData['volume_gb']]);
 }
 
-function deleteUserService($chat_id, $username, $server_id) {
+function deleteUserService($chat_id, $username, $server_id)
+{
     $stmt = pdo()->prepare("DELETE FROM services WHERE owner_chat_id = ? AND marzban_username = ? AND server_id = ?");
     return $stmt->execute([$chat_id, $username, $server_id]);
 }
@@ -413,7 +440,8 @@ function deleteUserService($chat_id, $username, $server_id) {
 // ---                        توابع کمکی و عمومی                     ---
 // =====================================================================
 
-function getPermissionMap() {
+function getPermissionMap()
+{
     return [
         'manage_categories' => '🗂 مدیریت دسته‌بندی‌ها',
         'manage_plans' => '📝 مدیریت پلن‌ها',
@@ -431,7 +459,8 @@ function getPermissionMap() {
     ];
 }
 
-function checkJoinStatus($user_id) {
+function checkJoinStatus($user_id)
+{
     $settings = getSettings();
     $channel_id = $settings['join_channel_id'];
     if ($settings['join_channel_status'] !== 'on' || empty($channel_id)) {
@@ -445,18 +474,21 @@ function checkJoinStatus($user_id) {
     return false;
 }
 
-function generateQrCodeUrl($text) {
+function generateQrCodeUrl($text)
+{
     return 'https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=' . urlencode($text);
 }
 
-function formatBytes($bytes, $precision = 2) {
+function formatBytes($bytes, $precision = 2)
+{
     if ($bytes <= 0) {
         return "0 GB";
     }
     return round(floatval($bytes) / pow(1024, 3), $precision) . ' GB';
 }
 
-function calculateIncomeStats() {
+function calculateIncomeStats()
+{
     $stats = [
         'today' =>
             pdo()
@@ -482,7 +514,8 @@ function calculateIncomeStats() {
 // ---                       توابع نمایش منوها                       ---
 // =====================================================================
 
-function generateGuideList($chat_id) {
+function generateGuideList($chat_id)
+{
     $stmt = pdo()->query("SELECT id, button_name, status FROM guides ORDER BY id DESC");
     $guides = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -506,7 +539,8 @@ function generateGuideList($chat_id) {
     }
 }
 
-function showGuideSelectionMenu($chat_id) {
+function showGuideSelectionMenu($chat_id)
+{
     $stmt = pdo()->query("SELECT id, button_name FROM guides WHERE status = 'active' ORDER BY id ASC");
     $guides = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -524,7 +558,8 @@ function showGuideSelectionMenu($chat_id) {
     sendMessage($chat_id, $message, ['inline_keyboard' => $keyboard_buttons]);
 }
 
-function generateDiscountCodeList($chat_id) {
+function generateDiscountCodeList($chat_id)
+{
     $stmt = pdo()->query("SELECT * FROM discount_codes ORDER BY id DESC");
     $codes = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -553,7 +588,8 @@ function generateDiscountCodeList($chat_id) {
     }
 }
 
-function generateCategoryList($chat_id) {
+function generateCategoryList($chat_id)
+{
     $categories = getCategories();
     if (empty($categories)) {
         sendMessage($chat_id, "هیچ دسته‌بندی‌ای یافت نشد.");
@@ -574,7 +610,8 @@ function generateCategoryList($chat_id) {
     }
 }
 
-function generatePlanList($chat_id) {
+function generatePlanList($chat_id)
+{
     $plans = pdo()
         ->query("SELECT p.*, s.name as server_name, s.type as server_type FROM plans p LEFT JOIN servers s ON p.server_id = s.id ORDER BY p.is_test_plan DESC, p.id ASC")
         ->fetchAll(PDO::FETCH_ASSOC);
@@ -597,19 +634,18 @@ function generatePlanList($chat_id) {
         $plan_info = "";
         if ($plan['is_test_plan']) {
             $plan_info .= "🧪 <b>(پلن تست) {$plan['name']}</b>\n";
-        }
-        else {
+        } else {
             $plan_info .= "{$status_icon} <b>{$plan['name']}</b>\n";
         }
 
         $plan_info .= "▫️ سرور: <b>{$server_name}</b>\n";
-        
+
         if ($plan['server_type'] === 'sanaei' && !empty($plan['inbound_id'])) {
             $plan_info .= "▫️ اینباند: <b>{$plan['inbound_id']}</b>\n";
         } elseif ($plan['server_type'] === 'marzneshin' && !empty($plan['marzneshin_service_id'])) {
             $plan_info .= "▫️ سرویس: <b>{$plan['marzneshin_service_id']}</b>\n";
         }
-        
+
         $plan_info .= "▫️ دسته‌بندی: {$cat_name}\n" . "▫️ قیمت: " . number_format($plan['price']) . " تومان\n" . "▫️ حجم: {$plan['volume_gb']} گیگابایت | " . "مدت: {$plan['duration_days']} روز\n";
 
         if ($plan['purchase_limit'] > 0) {
@@ -622,8 +658,7 @@ function generatePlanList($chat_id) {
 
         if ($plan['is_test_plan']) {
             $keyboard_buttons[] = [['text' => '↔️ تبدیل به پلن عادی', 'callback_data' => "make_plan_normal_{$plan_id}"]];
-        }
-        else {
+        } else {
             $keyboard_buttons[] = [['text' => '🧪 تنظیم به عنوان پلن تست', 'callback_data' => "set_as_test_plan_{$plan_id}"]];
         }
 
@@ -635,7 +670,8 @@ function generatePlanList($chat_id) {
     }
 }
 
-function showServersForCategory($chat_id, $category_id) {
+function showServersForCategory($chat_id, $category_id)
+{
     $category_stmt = pdo()->prepare("SELECT name FROM categories WHERE id = ?");
     $category_stmt->execute([$category_id]);
     $category_name = $category_stmt->fetchColumn();
@@ -662,14 +698,15 @@ function showServersForCategory($chat_id, $category_id) {
     $message = "🛍️ <b>دسته‌بندی «{$category_name}»</b>\n\nلطفاً سرور (لوکیشن) مورد نظر خود را انتخاب کنید:";
     $keyboard_buttons = [];
     foreach ($servers as $server) {
-      
+
         $keyboard_buttons[] = [['text' => "🖥 {$server['name']}", 'callback_data' => "show_plans_cat_{$category_id}_srv_{$server['id']}"]];
     }
     $keyboard_buttons[] = [['text' => '◀️ بازگشت به دسته‌بندی‌ها', 'callback_data' => 'back_to_categories']];
     sendMessage($chat_id, $message, ['inline_keyboard' => $keyboard_buttons]);
 }
 
-function showAdminManagementMenu($chat_id) {
+function showAdminManagementMenu($chat_id)
+{
     $admins = getAdmins();
     $message = "<b>👨‍💼 مدیریت ادمین‌ها</b>\n\nدر این بخش می‌توانید ادمین‌های ربات و دسترسی‌های آن‌ها را مدیریت کنید. (حداکثر ۱۰ ادمین)";
     $keyboard_buttons = [];
@@ -690,7 +727,8 @@ function showAdminManagementMenu($chat_id) {
     sendMessage($chat_id, $message, ['inline_keyboard' => $keyboard_buttons]);
 }
 
-function showPermissionEditor($chat_id, $message_id, $target_admin_id) {
+function showPermissionEditor($chat_id, $message_id, $target_admin_id)
+{
     $admins = getAdmins();
     $target_admin = $admins[$target_admin_id] ?? null;
     if (!$target_admin) {
@@ -725,7 +763,8 @@ function showPermissionEditor($chat_id, $message_id, $target_admin_id) {
     editMessageText($chat_id, $message_id, $message, ['inline_keyboard' => $keyboard_buttons]);
 }
 
-function handleMainMenu($chat_id, $first_name, $is_start_command = false) {
+function handleMainMenu($chat_id, $first_name, $is_start_command = false)
+{
 
     $isAnAdmin = isUserAdmin($chat_id);
     $user_data = getUserData($chat_id, $first_name);
@@ -733,8 +772,7 @@ function handleMainMenu($chat_id, $first_name, $is_start_command = false) {
 
     if ($is_start_command) {
         $message = "سلام $first_name عزیز!\nبه ربات فروش کانفیگ خوش آمدید. 🌹";
-    }
-    else {
+    } else {
         $message = "به منوی اصلی بازگشتید. لطفا گزینه مورد نظر را انتخاب کنید.";
     }
 
@@ -754,8 +792,7 @@ function handleMainMenu($chat_id, $first_name, $is_start_command = false) {
         if ($admin_view_mode === 'admin') {
             if ($is_start_command) {
                 $message = "ادمین عزیز، به پنل مدیریت خوش آمدید.";
-            }
-            else {
+            } else {
                 $message = "به پنل مدیریت بازگشتید.";
             }
             $admin_keyboard = [];
@@ -778,7 +815,7 @@ function handleMainMenu($chat_id, $first_name, $is_start_command = false) {
             }
             if (hasPermission($chat_id, 'manage_payment')) {
                 $rows[3][] = ['text' => '💳 مدیریت پرداخت'];
-                $rows[3][] = ['text' => '💳 مدیریت درگاه پرداخت']; 
+                $rows[3][] = ['text' => '💳 مدیریت درگاه پرداخت'];
             }
             if (hasPermission($chat_id, 'manage_marzban')) {
                 $rows[4][] = ['text' => '🌐 مدیریت سرورها'];
@@ -810,8 +847,7 @@ function handleMainMenu($chat_id, $first_name, $is_start_command = false) {
             }
             $admin_keyboard[] = [['text' => '↩️ بازگشت به منوی کاربری']];
             $keyboard_buttons = $admin_keyboard;
-        }
-        else {
+        } else {
             $keyboard_buttons[] = [['text' => '👑 ورود به پنل مدیریت']];
         }
     }
@@ -830,8 +866,7 @@ function handleMainMenu($chat_id, $first_name, $is_start_command = false) {
             'text' => '🏠',
             'reply_markup' => json_encode(['remove_keyboard' => true])
         ]), true)['result']['message_id'];
-    }
-    elseif (!USER_INLINE_KEYBOARD && $inline_keyboard == 1) {
+    } elseif (!USER_INLINE_KEYBOARD && $inline_keyboard == 1) {
         $stmt = pdo()->prepare("UPDATE users SET inline_keyboard = '0' WHERE chat_id = ?");
         $stmt->execute([$chat_id]);
     }
@@ -847,7 +882,8 @@ function handleMainMenu($chat_id, $first_name, $is_start_command = false) {
 
 }
 
-function showVerificationManagementMenu($chat_id) {
+function showVerificationManagementMenu($chat_id)
+{
     $settings = getSettings();
     $current_method = $settings['verification_method'];
     $iran_only_icon = $settings['verification_iran_only'] == 'on' ? '🇮🇷' : '🌎';
@@ -855,8 +891,7 @@ function showVerificationManagementMenu($chat_id) {
     $method_text = 'غیرفعال';
     if ($current_method == 'phone') {
         $method_text = 'شماره تلفن';
-    }
-    elseif ($current_method == 'button') {
+    } elseif ($current_method == 'button') {
         $method_text = 'دکمه شیشه‌ای';
     }
 
@@ -882,8 +917,7 @@ function showVerificationManagementMenu($chat_id) {
     $message_id = $update['callback_query']['message']['message_id'] ?? null;
     if ($message_id) {
         editMessageText($chat_id, $message_id, $message, $keyboard);
-    }
-    else {
+    } else {
         sendMessage($chat_id, $message, $keyboard);
     }
 }
@@ -892,7 +926,8 @@ function showVerificationManagementMenu($chat_id) {
 // ---             توابع انتزاعی برای مدیریت پنل‌ها                   ---
 // =====================================================================
 
-function getPanelUser($username, $server_id) {
+function getPanelUser($username, $server_id)
+{
     $stmt = pdo()->prepare("SELECT type FROM servers WHERE id = ?");
     $stmt->execute([$server_id]);
     $type = $stmt->fetchColumn();
@@ -909,7 +944,8 @@ function getPanelUser($username, $server_id) {
     }
 }
 
-function createPanelUser($plan, $chat_id, $plan_id) {
+function createPanelUser($plan, $chat_id, $plan_id)
+{
     $stmt = pdo()->prepare("SELECT type FROM servers WHERE id = ?");
     $stmt->execute([$plan['server_id']]);
     $type = $stmt->fetchColumn();
@@ -926,7 +962,8 @@ function createPanelUser($plan, $chat_id, $plan_id) {
     }
 }
 
-function deletePanelUser($username, $server_id) {
+function deletePanelUser($username, $server_id)
+{
     $stmt = pdo()->prepare("SELECT type FROM servers WHERE id = ?");
     $stmt->execute([$server_id]);
     $type = $stmt->fetchColumn();
@@ -943,7 +980,8 @@ function deletePanelUser($username, $server_id) {
     }
 }
 
-function modifyPanelUser($username, $server_id, $data) {
+function modifyPanelUser($username, $server_id, $data)
+{
     $stmt = pdo()->prepare("SELECT type FROM servers WHERE id = ?");
     $stmt->execute([$server_id]);
     $type = $stmt->fetchColumn();
@@ -994,32 +1032,34 @@ function showPlanEditor($chat_id, $message_id, $plan_id, $prompt = null)
     editMessageText($chat_id, $message_id, $message_text, $keyboard);
 }
 
-function fetchAndParseSubscriptionUrl($sub_url, $server_id) {
+function fetchAndParseSubscriptionUrl($sub_url, $server_id)
+{
     if (empty($sub_url)) {
         return [];
     }
-    
+
     $stmt = pdo()->prepare("SELECT url, sub_host FROM servers WHERE id = ?");
     $stmt->execute([$server_id]);
     $server_info = $stmt->fetch();
-    if (!$server_info) return [];
-    
-        $base_sub_url = !empty($server_info['sub_host']) ? rtrim($server_info['sub_host'], '/') : rtrim($server_info['url'], '/');
-    
+    if (!$server_info)
+        return [];
+
+    $base_sub_url = !empty($server_info['sub_host']) ? rtrim($server_info['sub_host'], '/') : rtrim($server_info['url'], '/');
+
     $stmt_type = pdo()->prepare("SELECT type FROM servers WHERE id = ?");
     $stmt_type->execute([$server_id]);
     $server_type = $stmt_type->fetchColumn();
 
     $sub_path = '';
-   
+
     if ($server_type === 'marzban' || $server_type === 'sanaei') {
         $sub_path_raw = strstr($sub_url, '/sub/');
         if ($sub_path_raw !== false) {
             $sub_path = $sub_path_raw;
         }
     }
-    
-    
+
+
     if (empty($sub_path)) {
         $sub_path = parse_url($sub_url, PHP_URL_PATH);
     }
@@ -1049,13 +1089,14 @@ function fetchAndParseSubscriptionUrl($sub_url, $server_id) {
     if ($decoded_links === false) {
         $decoded_links = $response_body;
     }
-    
+
     $links_array = preg_split("/\r\n|\n|\r/", trim($decoded_links));
-    
+
     return array_filter($links_array);
 }
 
-function showPlansForCategoryAndServer($chat_id, $category_id, $server_id) {
+function showPlansForCategoryAndServer($chat_id, $category_id, $server_id)
+{
     // دریافت نام دسته بندی و سرور برای نمایش در پیام
     $category_name = pdo()->prepare("SELECT name FROM categories WHERE id = ?")->execute([$category_id]) ? pdo()->lastInsertId() : 'نامشخص';
     $server_name = pdo()->prepare("SELECT name FROM servers WHERE id = ?")->execute([$server_id]) ? pdo()->lastInsertId() : 'نامشخص';
@@ -1084,7 +1125,8 @@ function showPlansForCategoryAndServer($chat_id, $category_id, $server_id) {
     sendMessage($chat_id, $message, ['inline_keyboard' => $keyboard_buttons]);
 }
 
-function applyRenewal($chat_id, $username, $days_to_add, $gb_to_add) {
+function applyRenewal($chat_id, $username, $days_to_add, $gb_to_add)
+{
     $stmt = pdo()->prepare("SELECT server_id FROM services WHERE owner_chat_id = ? AND marzban_username = ?");
     $stmt->execute([$chat_id, $username]);
     $server_id = $stmt->fetchColumn();
@@ -1120,19 +1162,19 @@ function applyRenewal($chat_id, $username, $days_to_add, $gb_to_add) {
     }
 
     if (empty($update_data)) {
-         return ['success' => false, 'message' => 'هیچ تغییری برای اعمال وجود نداشت.'];
+        return ['success' => false, 'message' => 'هیچ تغییری برای اعمال وجود نداشت.'];
     }
 
     $result = modifyPanelUser($username, $server_id, $update_data);
-    
+
     // بروزرسانی دیتابیس محلی
     if ($result && !isset($result['detail'])) {
-        if(isset($update_data['expire'])){
-             pdo()->prepare("UPDATE services SET expire_timestamp = ? WHERE marzban_username = ? AND server_id = ?")->execute([$update_data['expire'], $username, $server_id]);
+        if (isset($update_data['expire'])) {
+            pdo()->prepare("UPDATE services SET expire_timestamp = ? WHERE marzban_username = ? AND server_id = ?")->execute([$update_data['expire'], $username, $server_id]);
         }
-        if(isset($update_data['data_limit'])){
-             $new_volume_gb = ($update_data['data_limit'] / (1024*1024*1024));
-             pdo()->prepare("UPDATE services SET volume_gb = ? WHERE marzban_username = ? AND server_id = ?")->execute([$new_volume_gb, $username, $server_id]);
+        if (isset($update_data['data_limit'])) {
+            $new_volume_gb = ($update_data['data_limit'] / (1024 * 1024 * 1024));
+            pdo()->prepare("UPDATE services SET volume_gb = ? WHERE marzban_username = ? AND server_id = ?")->execute([$new_volume_gb, $username, $server_id]);
         }
         return ['success' => true];
     }
@@ -1140,13 +1182,14 @@ function applyRenewal($chat_id, $username, $days_to_add, $gb_to_add) {
     return ['success' => false, 'message' => 'خطا در ارتباط با پنل برای اعمال تغییرات.'];
 }
 
-function showRenewalManagementMenu($chat_id, $message_id = null) {
+function showRenewalManagementMenu($chat_id, $message_id = null)
+{
     $settings = getSettings();
     $status_icon = ($settings['renewal_status'] ?? 'off') == 'on' ? '✅' : '❌';
     $message = "<b>🔄 مدیریت تمدید سرویس</b>\n\n" .
-               "▫️ وضعیت کلی: " . ($status_icon == '✅' ? '<b>فعال</b>' : '<b>غیرفعال</b>') . "\n" .
-               "▫️ هزینه هر روز تمدید: <b>" . number_format($settings['renewal_price_per_day'] ?? 1000) . " تومان</b>\n" .
-               "▫️ هزینه هر گیگابایت تمدید: <b>" . number_format($settings['renewal_price_per_gb'] ?? 2000) . " تومان</b>";
+        "▫️ وضعیت کلی: " . ($status_icon == '✅' ? '<b>فعال</b>' : '<b>غیرفعال</b>') . "\n" .
+        "▫️ هزینه هر روز تمدید: <b>" . number_format($settings['renewal_price_per_day'] ?? 1000) . " تومان</b>\n" .
+        "▫️ هزینه هر گیگابایت تمدید: <b>" . number_format($settings['renewal_price_per_gb'] ?? 2000) . " تومان</b>";
 
     $keyboard = [
         'inline_keyboard' => [
@@ -1164,7 +1207,8 @@ function showRenewalManagementMenu($chat_id, $message_id = null) {
     }
 }
 
-function showMarzbanProtocolEditor($chat_id, $message_id, $server_id) {
+function showMarzbanProtocolEditor($chat_id, $message_id, $server_id)
+{
     $stmt_server = pdo()->prepare("SELECT name, marzban_protocols FROM servers WHERE id = ?");
     $stmt_server->execute([$server_id]);
     $server = $stmt_server->fetch();
@@ -1175,13 +1219,14 @@ function showMarzbanProtocolEditor($chat_id, $message_id, $server_id) {
     }
 
     $all_protocols = ['vless', 'vmess', 'trojan', 'shadowsocks'];
-    
-    $enabled_protocols = $server['marzban_protocols'] ? json_decode($server['marzban_protocols'], true) : ['vless']; 
-    if (!is_array($enabled_protocols)) $enabled_protocols = ['vless'];
-    
+
+    $enabled_protocols = $server['marzban_protocols'] ? json_decode($server['marzban_protocols'], true) : ['vless'];
+    if (!is_array($enabled_protocols))
+        $enabled_protocols = ['vless'];
+
     $message = "<b>⚙️ تنظیم پروتکل‌های سرور: {$server['name']}</b>\n\n";
     $message .= "پروتکل‌هایی را که می‌خواهید برای کاربران جدید در این سرور ایجاد شوند، انتخاب کنید.";
-    
+
     $keyboard_buttons = [];
     $row = [];
     foreach ($all_protocols as $protocol) {
@@ -1195,17 +1240,18 @@ function showMarzbanProtocolEditor($chat_id, $message_id, $server_id) {
     if (!empty($row)) {
         $keyboard_buttons[] = $row;
     }
-    
+
     $keyboard_buttons[] = [['text' => '◀️ بازگشت به سرور', 'callback_data' => "view_server_{$server_id}"]];
-    
+
     editMessageText($chat_id, $message_id, $message, ['inline_keyboard' => $keyboard_buttons]);
 }
 
-function createZarinpalLink($chat_id, $amount, $description, $metadata = []) {
+function createZarinpalLink($chat_id, $amount, $description, $metadata = [])
+{
     $settings = getSettings();
     $merchant_id = $settings['zarinpal_merchant_id'];
     $script_url = 'https://' . $_SERVER['HTTP_HOST'] . rtrim(dirname($_SERVER['PHP_SELF']), '/') . '/verify_payment.php';
-    
+
     $data = [
         "merchant_id" => $merchant_id,
         "amount" => $amount * 10, // تبدیل تومان به ریال
@@ -1221,18 +1267,18 @@ function createZarinpalLink($chat_id, $amount, $description, $metadata = []) {
     curl_setopt($ch, CURLOPT_POSTFIELDS, $jsonData);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json', 'Content-Length: ' . strlen($jsonData)]);
-    
+
     $result = curl_exec($ch);
     curl_close($ch);
     $result = json_decode($result, true);
-    
+
     if (empty($result['errors'])) {
         $authority = $result['data']['authority'];
-        
+
         // ثبت تراکنش در دیتابیس
         $stmt = pdo()->prepare("INSERT INTO transactions (user_id, amount, authority, description, metadata) VALUES (?, ?, ?, ?, ?)");
         $stmt->execute([$chat_id, $amount, $authority, $description, json_encode($metadata)]);
-        
+
         $payment_url = 'https://www.zarinpal.com/pg/StartPay/' . $authority;
         return ['success' => true, 'url' => $payment_url];
     } else {
@@ -1241,7 +1287,8 @@ function createZarinpalLink($chat_id, $amount, $description, $metadata = []) {
     }
 }
 
-function completePurchase($user_id, $plan_id, $custom_name, $final_price, $discount_code, $discount_object, $discount_applied) {
+function completePurchase($user_id, $plan_id, $custom_name, $final_price, $discount_code, $discount_object, $discount_applied)
+{
     $plan = getPlanById($plan_id);
     $user_data = getUserData($user_id);
     $first_name = $user_data['first_name'];
@@ -1265,9 +1312,9 @@ function completePurchase($user_id, $plan_id, $custom_name, $final_price, $disco
         if ($discount_applied && $discount_object) {
             pdo()->prepare("UPDATE discount_codes SET usage_count = usage_count + 1 WHERE id = ?")->execute([$discount_object['id']]);
         }
-        
+
         $expire_timestamp = $panel_user_data['expire'] ?? (isset($panel_user_data['expire_date']) ? strtotime($panel_user_data['expire_date']) : (time() + $plan['duration_days'] * 86400));
-        
+
         saveUserService($user_id, [
             'server_id' => $plan['server_id'],
             'username' => $panel_user_data['username'],
@@ -1277,7 +1324,7 @@ function completePurchase($user_id, $plan_id, $custom_name, $final_price, $disco
             'expire_timestamp' => $expire_timestamp,
             'volume_gb' => $plan['volume_gb'],
         ]);
-        
+
         $new_balance = $user_data['balance'] - $final_price;
         $sub_link = $panel_user_data['subscription_url'];
         $qr_code_url = generateQrCodeUrl($sub_link);
@@ -1292,12 +1339,12 @@ function completePurchase($user_id, $plan_id, $custom_name, $final_price, $disco
         if ($plan['show_sub_link']) {
             $caption .= "🔗 لینک اشتراک (Subscription):\n<code>" . htmlspecialchars($sub_link) . "</code>\n\n";
         }
-        
+
         $caption .= "💰 موجودی جدید شما: " . number_format($new_balance) . " تومان";
 
         $chat_info_response = apiRequest('getChat', ['chat_id' => $user_id]);
         $chat_info = json_decode($chat_info_response, true);
-        
+
         $profile_link_html = "👤 کاربر: " . htmlspecialchars($first_name) . " (<code>$user_id</code>)\n";
 
         $admin_notification = "✅ <b>خرید جدید</b>\n\n";
@@ -1312,7 +1359,7 @@ function completePurchase($user_id, $plan_id, $custom_name, $final_price, $disco
         } else {
             $admin_notification .= "💳 مبلغ پرداخت شده: " . number_format($final_price) . " تومان";
         }
-        
+
         $keyboard_buttons = [];
         if ($plan['show_conf_links'] && !empty($panel_user_data['links'])) {
             $keyboard_buttons[] = [['text' => '📋 دریافت کانفیگ‌ها', 'callback_data' => "get_configs_{$panel_user_data['username']}"]];
@@ -1326,7 +1373,7 @@ function completePurchase($user_id, $plan_id, $custom_name, $final_price, $disco
             'admin_notification' => $admin_notification,
         ];
     }
-    
+
     return [
         'success' => false,
         'error_message' => "❌ متاسفانه در ایجاد سرویس شما مشکلی پیش آمد. لطفا با پشتیبانی تماس بگیرید. مبلغی از حساب شما کسر نشده است."
