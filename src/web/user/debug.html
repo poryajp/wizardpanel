@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Panel</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+
+        .debug-box {
+            background: white;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .debug-box h3 {
+            margin: 0 0 10px 0;
+            color: #333;
+        }
+
+        .success {
+            color: green;
+        }
+
+        .error {
+            color: red;
+        }
+
+        pre {
+            background: #f0f0f0;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+            font-size: 12px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="debug-box">
+        <h3>🔍 Telegram Web App Debug</h3>
+        <div id="debug-info"></div>
+    </div>
+
+    <div class="debug-box">
+        <h3>📊 Test Results</h3>
+        <div id="test-results"></div>
+    </div>
+
+    <script>
+        const debugInfo = document.getElementById('debug-info');
+        const testResults = document.getElementById('test-results');
+
+        function log(message, type = 'info') {
+            const color = type === 'success' ? 'green' : type === 'error' ? 'red' : 'black';
+            testResults.innerHTML += `<div style="color: ${color}; margin: 5px 0;">${message}</div>`;
+        }
+
+        // Check if Telegram object exists
+        log('1. Checking Telegram object...');
+        if (typeof Telegram !== 'undefined') {
+            log('✅ Telegram object exists', 'success');
+        } else {
+            log('❌ Telegram object NOT found', 'error');
+        }
+
+        // Check if WebApp exists
+        log('2. Checking Telegram.WebApp...');
+        if (typeof Telegram !== 'undefined' && Telegram.WebApp) {
+            log('✅ Telegram.WebApp exists', 'success');
+
+            const tg = Telegram.WebApp;
+
+            // Display all WebApp properties
+            debugInfo.innerHTML = `
+                <p><strong>Platform:</strong> ${tg.platform}</p>
+                <p><strong>Version:</strong> ${tg.version}</p>
+                <p><strong>Color Scheme:</strong> ${tg.colorScheme}</p>
+                <p><strong>initData exists:</strong> ${tg.initData ? 'YES ✅' : 'NO ❌'}</p>
+                <p><strong>initData length:</strong> ${tg.initData ? tg.initData.length : 0}</p>
+            `;
+
+            // Check initData
+            log('3. Checking initData...');
+            if (tg.initData) {
+                log('✅ initData exists (length: ' + tg.initData.length + ')', 'success');
+
+                // Parse initData
+                const params = new URLSearchParams(tg.initData);
+                const user = params.get('user');
+
+                if (user) {
+                    log('✅ User data found in initData', 'success');
+                    try {
+                        const userData = JSON.parse(user);
+                        log('User ID: ' + userData.id, 'success');
+                        log('User Name: ' + userData.first_name, 'success');
+                    } catch (e) {
+                        log('❌ Error parsing user data: ' + e.message, 'error');
+                    }
+                } else {
+                    log('❌ No user data in initData', 'error');
+                }
+
+                // Try to authenticate
+                log('4. Testing authentication...');
+                fetch('index.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: 'initData=' + encodeURIComponent(tg.initData)
+                })
+                    .then(response => {
+                        log('Response status: ' + response.status, response.ok ? 'success' : 'error');
+                        return response.json();
+                    })
+                    .then(data => {
+                        log('Response data: ' + JSON.stringify(data), 'success');
+                        if (data.success) {
+                            log('✅ Authentication successful! Redirecting...', 'success');
+                            setTimeout(() => {
+                                window.location.href = 'index.php';
+                            }, 2000);
+                        } else {
+                            log('❌ Authentication failed: ' + (data.error || 'Unknown error'), 'error');
+                        }
+                    })
+                    .catch(error => {
+                        log('❌ Fetch error: ' + error.message, 'error');
+                    });
+            } else {
+                log('❌ initData is empty', 'error');
+                log('ℹ️ This app must be opened from Telegram bot using Web App button', 'error');
+            }
+        } else {
+            log('❌ Telegram.WebApp NOT found', 'error');
+        }
+    </script>
+</body>
+
+</html>

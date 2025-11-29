@@ -261,6 +261,119 @@ function resetAllUsersTestCount()
     return $stmt->rowCount();
 }
 
+/**
+ * Add volume (GB) to all active services - Updates both database AND panel servers
+ * Returns array with success and fail counts
+ */
+function addVolumeToAllServices($volume_gb)
+{
+    $bytes_to_add = $volume_gb * 1024 * 1024 * 1024;
+
+    $all_services = pdo()
+        ->query("SELECT marzban_username, server_id FROM services")
+        ->fetchAll(PDO::FETCH_ASSOC);
+
+    $success_count = 0;
+    $fail_count = 0;
+
+    foreach ($all_services as $service) {
+        $username = $service['marzban_username'];
+        $server_id = $service['server_id'];
+
+        if (!$server_id) {
+            $fail_count++;
+            continue;
+        }
+
+        // Get current user data from panel
+        $current_user_data = getPanelUser($username, $server_id);
+
+        if ($current_user_data && !isset($current_user_data['detail'])) {
+            $current_limit = $current_user_data['data_limit'];
+
+            if ($current_limit > 0) {
+                $new_limit = $current_limit + $bytes_to_add;
+
+                // Update on panel server via API
+                $result = modifyPanelUser($username, $server_id, ['data_limit' => $new_limit]);
+
+                if ($result && !isset($result['detail'])) {
+                    $success_count++;
+                } else {
+                    $fail_count++;
+                }
+            } else {
+                // User has unlimited data
+                $fail_count++;
+            }
+        } else {
+            $fail_count++;
+        }
+
+        // Small delay to avoid overwhelming the API
+        usleep(100000); // 0.1 second
+    }
+
+    return ['success' => $success_count, 'fail' => $fail_count];
+}
+
+/**
+ * Add time (days) to all active services - Updates both database AND panel servers
+ * Returns array with success and fail counts
+ */
+function addTimeToAllServices($days)
+{
+    $seconds_to_add = $days * 86400; // 86400 seconds in a day
+
+    $all_services = pdo()
+        ->query("SELECT marzban_username, server_id FROM services")
+        ->fetchAll(PDO::FETCH_ASSOC);
+
+    $success_count = 0;
+    $fail_count = 0;
+
+    foreach ($all_services as $service) {
+        $username = $service['marzban_username'];
+        $server_id = $service['server_id'];
+
+        if (!$server_id) {
+            $fail_count++;
+            continue;
+        }
+
+        // Get current user data from panel
+        $current_user_data = getPanelUser($username, $server_id);
+
+        if ($current_user_data && !isset($current_user_data['detail'])) {
+            $current_expire = $current_user_data['expire'] ?? 0;
+
+            if ($current_expire > 0) {
+                // If already expired, start from now. Otherwise add to current expiry
+                $new_expire = $current_expire < time() ? time() + $seconds_to_add : $current_expire + $seconds_to_add;
+
+                // Update on panel server via API
+                $result = modifyPanelUser($username, $server_id, ['expire' => $new_expire]);
+
+                if ($result && !isset($result['detail'])) {
+                    $success_count++;
+                } else {
+                    $fail_count++;
+                }
+            } else {
+                // User has unlimited time
+                $fail_count++;
+            }
+        } else {
+            $fail_count++;
+        }
+
+        // Small delay to avoid overwhelming the API
+        usleep(100000); // 0.1 second
+    }
+
+    return ['success' => $success_count, 'fail' => $fail_count];
+}
+
 // --- مدیریت ادمین‌ها ---
 function getAdmins()
 {
@@ -787,6 +900,9 @@ function handleMainMenu($chat_id, $first_name, $is_start_command = false)
     if ($stmt->fetchColumn() > 0) {
         $keyboard_buttons[] = [['text' => '📚 راهنما']];
     }
+
+    // Add User Panel Button
+    $keyboard_buttons[] = [['text' => '📱 پنل کاربری']];
 
     if ($isAnAdmin) {
         if ($admin_view_mode === 'admin') {
@@ -1378,4 +1494,17 @@ function completePurchase($user_id, $plan_id, $custom_name, $final_price, $disco
         'success' => false,
         'error_message' => "❌ متاسفانه در ایجاد سرویس شما مشکلی پیش آمد. لطفا با پشتیبانی تماس بگیرید. مبلغی از حساب شما کسر نشده است."
     ];
+}
+
+function getServers()
+{
+    $stmt = pdo()->query("SELECT * FROM servers ORDER BY id DESC");
+    return $stmt->fetchAll(PDO::FETCH_ASSOC);
+}
+
+function getServerById($id)
+{
+    $stmt = pdo()->prepare("SELECT * FROM servers WHERE id = ?");
+    $stmt->execute([$id]);
+    return $stmt->fetch(PDO::FETCH_ASSOC);
 }

@@ -46,6 +46,9 @@ body {
     flex: 1;
     margin-right: var(--sidebar-width);
     transition: margin-right 0.3s;
+    width: 100%;
+    min-width: 0;
+    /* Important for flex child */
 }
 
 /* Sidebar */
@@ -61,6 +64,7 @@ body {
     flex-direction: column;
     z-index: 1000;
     transition: transform 0.3s;
+    overflow-y: auto;
 }
 
 .sidebar-header {
@@ -151,6 +155,7 @@ body {
 .topbar h1 {
     font-size: 1.5rem;
     font-weight: 600;
+    flex: 1;
 }
 
 .menu-toggle {
@@ -161,6 +166,12 @@ body {
     font-size: 1.5rem;
     cursor: pointer;
     margin-left: 15px;
+    padding: 8px;
+}
+
+.menu-toggle:hover {
+    background-color: rgba(139, 92, 246, 0.1);
+    border-radius: 8px;
 }
 
 /* Content Area */
@@ -200,17 +211,42 @@ body {
     align-items: center;
     justify-content: center;
     font-size: 1.5rem;
+    flex-shrink: 0;
 }
 
-.stat-icon.blue { background: rgba(59, 130, 246, 0.2); color: var(--blue); }
-.stat-icon.green { background: rgba(16, 185, 129, 0.2); color: var(--green); }
-.stat-icon.purple { background: rgba(139, 92, 246, 0.2); color: var(--purple); }
-.stat-icon.orange { background: rgba(249, 115, 22, 0.2); color: var(--orange); }
-.stat-icon.teal { background: rgba(20, 184, 166, 0.2); color: var(--teal); }
-.stat-icon.red { background: rgba(239, 68, 68, 0.2); color: var(--red); }
+.stat-icon.blue {
+    background: rgba(59, 130, 246, 0.2);
+    color: var(--blue);
+}
+
+.stat-icon.green {
+    background: rgba(16, 185, 129, 0.2);
+    color: var(--green);
+}
+
+.stat-icon.purple {
+    background: rgba(139, 92, 246, 0.2);
+    color: var(--purple);
+}
+
+.stat-icon.orange {
+    background: rgba(249, 115, 22, 0.2);
+    color: var(--orange);
+}
+
+.stat-icon.teal {
+    background: rgba(20, 184, 166, 0.2);
+    color: var(--teal);
+}
+
+.stat-icon.red {
+    background: rgba(239, 68, 68, 0.2);
+    color: var(--red);
+}
 
 .stat-info {
     flex: 1;
+    min-width: 0;
 }
 
 .stat-value {
@@ -247,6 +283,7 @@ body {
 .card-header h3 {
     font-size: 1.25rem;
     font-weight: 600;
+    word-break: break-word;
 }
 
 .card-header h3 i {
@@ -261,6 +298,7 @@ body {
 .data-table {
     width: 100%;
     border-collapse: collapse;
+    min-width: 600px;
 }
 
 .data-table thead {
@@ -272,6 +310,7 @@ body {
     text-align: right;
     font-weight: 600;
     color: var(--text-light);
+    white-space: nowrap;
 }
 
 .data-table tbody tr {
@@ -406,25 +445,248 @@ textarea:focus {
     margin-top: 20px;
 }
 
-/* Responsive */
+/* Mobile Overlay */
+.sidebar-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 999;
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+
+.sidebar-overlay.active {
+    opacity: 1;
+}
+
+/* ==================== Responsive Design ==================== */
+
+/* Tablets (768px - 1024px) */
+@media (max-width: 1024px) {
+    .content-area {
+        padding: 20px;
+    }
+
+    .topbar {
+        padding: 15px 20px;
+    }
+
+    .stats-grid {
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 15px;
+    }
+
+    .stat-value {
+        font-size: 1.5rem;
+    }
+}
+
+/* Mobile Devices (up to 768px) */
 @media (max-width: 768px) {
+    :root {
+        --sidebar-width: 280px;
+    }
+
+    /* Hide sidebar by default on mobile */
     .sidebar {
         transform: translateX(100%);
+        box-shadow: -5px 0 15px rgba(0, 0, 0, 0.3);
     }
-    
+
     .sidebar.active {
         transform: translateX(0);
     }
-    
+
+    /* Show overlay when sidebar is active */
+    .sidebar-overlay {
+        display: block;
+    }
+
+    /* Remove sidebar margin from main content */
     .main-content {
         margin-right: 0;
     }
-    
+
+    /* Show menu toggle button */
     .menu-toggle {
         display: block;
     }
-    
+
+    /* Adjust topbar */
+    .topbar {
+        padding: 12px 15px;
+    }
+
+    .topbar h1 {
+        font-size: 1.2rem;
+    }
+
+    /* Content area padding */
+    .content-area {
+        padding: 15px;
+    }
+
+    /* Stats grid - single column */
     .stats-grid {
         grid-template-columns: 1fr;
+        gap: 12px;
+    }
+
+    .stat-card {
+        padding: 16px;
+        gap: 12px;
+    }
+
+    .stat-icon {
+        width: 50px;
+        height: 50px;
+        font-size: 1.2rem;
+    }
+
+    .stat-value {
+        font-size: 1.5rem;
+    }
+
+    .stat-label {
+        font-size: 0.85rem;
+    }
+
+    /* Cards */
+    .card-header {
+        padding: 15px;
+    }
+
+    .card-header h3 {
+        font-size: 1.1rem;
+    }
+
+    .card-body {
+        padding: 15px;
+    }
+
+    /* Tables - enable horizontal scroll */
+    .card-body {
+        overflow-x: auto;
+    }
+
+    .data-table {
+        font-size: 0.85rem;
+    }
+
+    .data-table th,
+    .data-table td {
+        padding: 8px;
+        white-space: nowrap;
+    }
+
+    /* Forms */
+    input[type="text"],
+    input[type="password"],
+    input[type="number"],
+    input[type="email"],
+    select,
+    textarea {
+        font-size: 16px;
+        /* Prevents zoom on iOS */
+    }
+
+    /* Buttons */
+    .btn {
+        padding: 10px 16px;
+        font-size: 0.9rem;
+        width: 100%;
+        margin-bottom: 8px;
+    }
+
+    .btn:last-child {
+        margin-bottom: 0;
+    }
+
+    /* Sidebar adjustments */
+    .sidebar-header {
+        padding: 20px 15px;
+    }
+
+    .sidebar-header h2 {
+        font-size: 1.3rem;
+    }
+
+    .sidebar-nav a {
+        padding: 10px 15px;
+        font-size: 0.95rem;
+    }
+}
+
+/* Small Mobile Devices (up to 480px) */
+@media (max-width: 480px) {
+    .topbar h1 {
+        font-size: 1rem;
+    }
+
+    .content-area {
+        padding: 10px;
+    }
+
+    .stat-card {
+        flex-direction: column;
+        text-align: center;
+    }
+
+    .stat-value {
+        font-size: 1.8rem;
+    }
+
+    .card-header h3 {
+        font-size: 1rem;
+    }
+
+    .data-table {
+        font-size: 0.75rem;
+    }
+
+    .data-table th,
+    .data-table td {
+        padding: 6px 4px;
+    }
+
+    /* Make buttons stack vertically */
+    .btn {
+        display: block;
+        width: 100%;
+    }
+
+    /* Adjust sidebar width for very small screens */
+    :root {
+        --sidebar-width: 90%;
+    }
+}
+
+/* Landscape orientation on mobile */
+@media (max-width: 768px) and (orientation: landscape) {
+    .sidebar {
+        width: 60%;
+    }
+
+    .content-area {
+        padding: 15px;
+    }
+}
+
+/* Print styles */
+@media print {
+
+    .sidebar,
+    .topbar,
+    .menu-toggle,
+    .btn {
+        display: none;
+    }
+
+    .main-content {
+        margin: 0;
     }
 }
