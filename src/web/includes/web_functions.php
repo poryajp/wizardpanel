@@ -9,8 +9,13 @@ require_once __DIR__ . '/../../includes/functions.php';
 
 // Define USER_INLINE_KEYBOARD constant needed by functions.php
 if (!defined('USER_INLINE_KEYBOARD')) {
-    $settings = getSettings();
-    define('USER_INLINE_KEYBOARD', ($settings['inline_keyboard'] ?? 'on') === 'on');
+    try {
+        $settings = getSettings();
+        define('USER_INLINE_KEYBOARD', ($settings['inline_keyboard'] ?? 'on') === 'on');
+    } catch (Exception $e) {
+        // Default to 'on' if settings cannot be loaded
+        define('USER_INLINE_KEYBOARD', true);
+    }
 }
 
 /**
@@ -163,20 +168,4 @@ function showError($message)
 function sanitizeInput($data)
 {
     return htmlspecialchars(strip_tags(trim($data)));
-}
-
-/**
- * Helper wrappers for functions.php
- */
-function getUserBalance($chat_id)
-{
-    $stmt = pdo()->prepare("SELECT balance FROM users WHERE chat_id = ?");
-    $stmt->execute([$chat_id]);
-    return $stmt->fetchColumn() ?? 0;
-}
-
-function getServers()
-{
-    $stmt = pdo()->query("SELECT * FROM servers WHERE status = 'active' ORDER BY id DESC");
-    return $stmt->fetchAll(PDO::FETCH_ASSOC);
 }

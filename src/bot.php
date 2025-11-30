@@ -1104,6 +1104,55 @@ if (isset($update['callback_query'])) {
                 sendMessage($chat_id, "لطفا پاسخ خود را برای تیکت <code>$ticket_id</code> وارد کنید:", $cancelKeyboard);
             }
         }
+    } elseif (strpos($data, 'approve_charge_') === 0 || strpos($data, 'reject_charge_') === 0) {
+        // Handle payment request approval/rejection
+        if ($isAnAdmin && !hasPermission($chat_id, 'manage_payment')) {
+            apiRequest('answerCallbackQuery', ['callback_query_id' => $callback_id, 'text' => 'شما دسترسی لازم برای مدیریت پرداخت‌ها را ندارید.', 'show_alert' => true]);
+            die;
+        }
+
+        list($action, $charge_word, $request_id) = explode('_', $data);
+
+        $stmt = pdo()->prepare("SELECT * FROM payment_requests WHERE id = ?");
+        $stmt->execute([$request_id]);
+        $request = $stmt->fetch();
+
+        if (!$request || $request['status'] !== 'pending') {
+            apiRequest('answerCallbackQuery', ['callback_query_id' => $callback_id, 'text' => 'این درخواست قبلا پردازش شده است.', 'show_alert' => true]);
+            die;
+        }
+
+        $admin_who_processed = $update['callback_query']['from']['id'];
+
+        if ($action == 'approve') {
+            // Update user balance
+            $stmt_balance = pdo()->prepare("UPDATE users SET balance = balance + ? WHERE chat_id = ?");
+            $stmt_balance->execute([$request['amount'], $request['user_id']]);
+
+            // Update request status
+            pdo()->prepare("UPDATE payment_requests SET status = 'approved', processed_by_admin_id = ?, processed_at = NOW() WHERE id = ?")->execute([$admin_who_processed, $request_id]);
+
+            // Notify user
+            sendMessage($request['user_id'], "✅ درخواست شارژ کیف پول شما به مبلغ " . number_format($request['amount']) . " تومان تایید شد و به حساب شما اضافه گردید.");
+
+            // Update admin message
+            $new_caption = $update['callback_query']['message']['caption'] . "\n\n<b>✅ توسط شما تایید و واریز شد.</b>";
+            editMessageCaption($chat_id, $message_id, $new_caption, null);
+
+            apiRequest('answerCallbackQuery', ['callback_query_id' => $callback_id, 'text' => '✅ شارژ تایید و واریز شد.']);
+        } elseif ($action == 'reject') {
+            // Update request status
+            pdo()->prepare("UPDATE payment_requests SET status = 'rejected', processed_by_admin_id = ?, processed_at = NOW() WHERE id = ?")->execute([$admin_who_processed, $request_id]);
+
+            // Notify user
+            sendMessage($request['user_id'], "❌ درخواست شارژ کیف پول شما به مبلغ " . number_format($request['amount']) . " تومان توسط ادمین رد شد. لطفاً با پشتیبانی تماس بگیرید.");
+
+            // Update admin message
+            $new_caption = $update['callback_query']['message']['caption'] . "\n\n<b>❌ توسط شما رد شد.</b>";
+            editMessageCaption($chat_id, $message_id, $new_caption, null);
+
+            apiRequest('answerCallbackQuery', ['callback_query_id' => $callback_id, 'text' => '❌ درخواست رد شد.']);
+        }
     } elseif (strpos($data, 'approve_renewal_') === 0 || strpos($data, 'reject_renewal_') === 0) {
         list($action, $type, $request_id) = explode('_', $data);
 
@@ -1230,7 +1279,24 @@ if (isset($update['callback_query'])) {
         updateUserData($chat_id, 'awaiting_payment_screenshot', ['charge_amount' => $amount]);
     } elseif (strpos($data, 'cat_') === 0) {
         $categoryId = str_replace('cat_', '', $data);
-        showServersForCategory($chat_id, $categoryId);
+
+        // Check if only one server exists for this category
+        $stmt = pdo()->prepare("
+            SELECT DISTINCT s.id 
+            FROM servers s
+            JOIN plans p ON s.id = p.server_id
+            WHERE p.category_id = ? AND p.status = 'active' AND s.status = 'active'
+        ");
+        $stmt->execute([$categoryId]);
+        $servers = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        if (count($servers) === 1) {
+            // Auto-skip to plan selection
+            showPlansForCategoryAndServer($chat_id, $categoryId, $servers[0]['id']);
+        } else {
+            // Show server selection
+            showServersForCategory($chat_id, $categoryId);
+        }
         deleteMessage($chat_id, $message_id);
     } elseif (strpos($data, 'show_plans_cat_') === 0) {
         preg_match('/show_plans_cat_(\d+)_srv_(\d+)/', $data, $matches);
@@ -1285,58 +1351,7 @@ if (isset($update['callback_query'])) {
         sendMessage($chat_id, $message, $cancelKeyboard);
         apiRequest('answerCallbackQuery', ['callback_query_id' => $callback_id]);
         die;
-    } elseif ($data === 'confirm_renewal_payment') {
-        $state_data = $user_data['state_data'];
-        $total_cost = $state_data['renewal_total_cost'];
-
-        if ($user_data['balance'] >= $total_cost) {
-            // پرداخت از موجودی
-            editMessageText($chat_id, $message_id, "⏳ در حال تمدید سرویس با استفاده از موجودی شما...");
-            updateUserBalance($chat_id, $total_cost, 'deduct');
-
-            $result = applyRenewal($chat_id, $state_data['renewal_username'], $state_data['renewal_days'], $state_data['renewal_gb']);
-
-            if ($result['success']) {
-                $new_balance = number_format($user_data['balance'] - $total_cost);
-                $success_msg = "✅ سرویس شما با موفقیت تمدید شد.\n\n" .
-                    "💰 مبلغ " . number_format($total_cost) . " تومان از حساب شما کسر گردید.\n" .
-                    "موجودی جدید: {$new_balance} تومان.";
-                editMessageText($chat_id, $message_id, $success_msg);
-            } else {
-                editMessageText($chat_id, $message_id, "❌ خطایی در تمدید سرویس رخ داد: " . $result['message']);
-
-                updateUserBalance($chat_id, $total_cost, 'add');
-            }
-            updateUserData($chat_id, 'main_menu');
-
-        } else {
-
-            $stmt = pdo()->prepare(
-                "INSERT INTO renewal_requests (user_id, service_username, days_to_add, gb_to_add, total_cost) VALUES (?, ?, ?, ?, ?)"
-            );
-            $stmt->execute([$chat_id, $state_data['renewal_username'], $state_data['renewal_days'], $state_data['renewal_gb'], $total_cost]);
-            $request_id = pdo()->lastInsertId();
-
-            $state_data['renewal_request_id'] = $request_id;
-            updateUserData($chat_id, 'awaiting_renewal_screenshot', $state_data);
-
-
-            $settings = getSettings();
-            $payment_method = $settings['payment_method'] ?? [];
-            if (empty($payment_method['card_number'])) {
-                editMessageText($chat_id, $message_id, "موجودی شما کافی نیست و روش پرداخت کارت به کارت نیز توسط ادمین تنظیم نشده است. لطفا ابتدا حساب خود را شارژ کنید.");
-            } else {
-                $card_number = $payment_method['card_number'] ?? '';
-                $card_holder = $payment_method['card_holder'] ?? '';
-                $copy_enabled = $payment_method['copy_enabled'] ?? false;
-                $card_number_display = $copy_enabled ? "<code>{$card_number}</code>" : $card_number;
-                $message = "موجودی شما کافی نیست. لطفا مبلغ <b>" . number_format($total_cost) . " تومان</b> را به اطلاعات زیر واریز کرده و سپس اسکرین‌شات رسید را ارسال کنید:\n\n" .
-                    "💳 شماره کارت:\n" . $card_number_display . "\n" .
-                    "👤 صاحب حساب: {$card_holder}";
-                editMessageText($chat_id, $message_id, $message);
-            }
-        }
-        apiRequest('answerCallbackQuery', ['callback_query_id' => $callback_id]);
+        // Note: confirm_renewal_payment handler حذف شد - این بخش به سیستم جدید تمدید بر اساس پلن منتقل شده است
     } elseif ($data == 'back_to_categories') {
         deleteMessage($chat_id, $message_id);
         $categories = getCategories(true);
@@ -1440,15 +1455,118 @@ if (isset($update['callback_query'])) {
         }
 
         $username = str_replace('renew_service_', '', $data);
-        updateUserData($chat_id, 'user_awaiting_renewal_days', ['renewal_username' => $username]);
 
-        $price_day = number_format($settings['renewal_price_per_day'] ?? 1000);
-        $message = "<b>تمدید سرویس</b>\n\n" .
-            "۱. چند **روز** به اعتبار سرویس شما اضافه شود؟\n\n" .
-            "▫️ هزینه هر روز: {$price_day} تومان\n" .
-            "💡 برای رد شدن و عدم تمدید زمان، عدد `0` را وارد کنید.";
+        // ذخیره username سرویس که قرار است تمدید شود
+        updateUserData($chat_id, 'renewal_selecting_category', [
+            'renewal_username' => $username,
+            'is_renewal' => true
+        ]);
 
-        editMessageCaption($chat_id, $message_id, $message, null);
+        // نمایش دسته‌بندی‌ها
+        deleteMessage($chat_id, $message_id);
+        $categories = getCategories(true);
+        $keyboard_buttons = [];
+        foreach ($categories as $category) {
+            $keyboard_buttons[] = [['text' => '🛍 ' . $category['name'], 'callback_data' => 'renewal_cat_' . $category['id']]];
+        }
+        $keyboard_buttons[] = [['text' => '◀️ بازگشت', 'callback_data' => "service_details_{$username}"]];
+        sendMessage($chat_id, "🔄 <b>تمدید سرویس</b>\n\nبرای تمدید سرویس، لطفاً دسته‌بندی مورد نظر را انتخاب کنید:", ['inline_keyboard' => $keyboard_buttons]);
+        apiRequest('answerCallbackQuery', ['callback_query_id' => $callback_id]);
+    } elseif (strpos($data, 'renewal_cat_') === 0) {
+        // handler انتخاب دسته‌بندی برای تمدید
+        $categoryId = str_replace('renewal_cat_', '', $data);
+        $state_data = $user_data['state_data'];
+        $state_data['renewal_category_id'] = $categoryId;
+
+        // Check if only one server exists for this category
+        $stmt = pdo()->prepare("
+            SELECT DISTINCT s.id 
+            FROM servers s
+            JOIN plans p ON s.id = p.server_id
+            WHERE p.category_id = ? AND p.status = 'active' AND s.status = 'active'
+        ");
+        $stmt->execute([$categoryId]);
+        $servers = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        if (count($servers) === 1) {
+            // Auto-skip to plan selection
+            $server_id = $servers[0]['id'];
+            $state_data['renewal_server_id'] = $server_id;
+            updateUserData($chat_id, 'renewal_selecting_plan', $state_data);
+            showPlansForCategoryAndServerRenewal($chat_id, $categoryId, $server_id, $state_data['renewal_username']);
+        } else {
+            updateUserData($chat_id, 'renewal_selecting_server', $state_data);
+            showServersForCategoryRenewal($chat_id, $categoryId, $state_data['renewal_username']);
+        }
+        deleteMessage($chat_id, $message_id);
+        apiRequest('answerCallbackQuery', ['callback_query_id' => $callback_id]);
+    } elseif (strpos($data, 'renewal_show_plans_') === 0) {
+        // handler انتخاب سرور برای تمدید
+        preg_match('/renewal_show_plans_cat_(\d+)_srv_(\d+)/', $data, $matches);
+        $category_id = $matches[1];
+        $server_id = $matches[2];
+        $state_data = $user_data['state_data'];
+        $state_data['renewal_server_id'] = $server_id;
+        updateUserData($chat_id, 'renewal_selecting_plan', $state_data);
+
+        showPlansForCategoryAndServerRenewal($chat_id, $category_id, $server_id, $state_data['renewal_username']);
+        deleteMessage($chat_id, $message_id);
+        apiRequest('answerCallbackQuery', ['callback_query_id' => $callback_id]);
+    } elseif (strpos($data, 'renewal_buy_plan_') === 0) {
+        // handler انتخاب پلن برای تمدید
+        $parts = explode('_', $data);
+        $plan_id = $parts[3];
+
+        $state_data = $user_data['state_data'];
+        $username_to_renew = $state_data['renewal_username'];
+
+        $plan = getPlanById($plan_id);
+        if (!$plan) {
+            apiRequest('answerCallbackQuery', ['callback_query_id' => $callback_id, 'text' => '❌ خطا: پلن یافت نشد.', 'show_alert' => true]);
+            die;
+        }
+
+        $final_price = (float) $plan['price'];
+        $user_balance = $user_data['balance'];
+
+        if ($user_balance >= $final_price) {
+            editMessageText($chat_id, $message_id, "⏳ در حال تمدید سرویس شما...");
+
+            $renewal_result = applyPlanRenewal($chat_id, $username_to_renew, $plan_id, $final_price);
+
+            if ($renewal_result['success']) {
+                editMessageText($chat_id, $message_id, $renewal_result['message']);
+            } else {
+                editMessageText($chat_id, $message_id, "❌ " . $renewal_result['message']);
+            }
+
+            updateUserData($chat_id, 'main_menu');
+            handleMainMenu($chat_id, $first_name);
+        } else {
+            // موجودی کافی نیست، نیاز به پرداخت
+            $needed_amount = $final_price - $user_balance;
+            $settings = getSettings();
+
+            $keyboard_buttons = [];
+            if (($settings['payment_gateway_status'] ?? 'off') == 'on' && !empty($settings['zarinpal_merchant_id'])) {
+                $keyboard_buttons[] = [['text' => '🌐 پرداخت آنلاین (زرین‌پال)', 'callback_data' => "charge_for_renewal_{$needed_amount}_{$plan_id}_{$username_to_renew}"]];
+            }
+            if (!empty($settings['payment_method']['card_number'])) {
+                $keyboard_buttons[] = [['text' => '💳 پرداخت کارت به کارت', 'callback_data' => "manual_pay_for_renewal_{$needed_amount}_{$plan_id}_{$username_to_renew}"]];
+            }
+
+            if (empty($keyboard_buttons)) {
+                editMessageText($chat_id, $message_id, "❌ موجودی شما کافی نیست و هیچ روش پرداختی توسط ادمین فعال نشده است.");
+            } else {
+                $message = "⚠️ موجودی شما کافی نیست!\n\n" .
+                    "▫️ قیمت پلن: " . number_format($final_price) . " تومان\n" .
+                    "▫️ موجودی شما: " . number_format($user_balance) . " تومان\n" .
+                    "<b>💰 مبلغ مورد نیاز: " . number_format($needed_amount) . " تومان</b>\n\n" .
+                    "لطفاً روش پرداخت برای تکمیل تمدید را انتخاب کنید:";
+                editMessageText($chat_id, $message_id, $message, ['inline_keyboard' => $keyboard_buttons]);
+            }
+        }
+
         apiRequest('answerCallbackQuery', ['callback_query_id' => $callback_id]);
     } elseif (strpos($data, 'delete_service_confirm_') === 0) {
         $username = str_replace('delete_service_confirm_', '', $data);
@@ -2769,99 +2887,70 @@ if (isset($update['message']) || USER_INLINE_KEYBOARD) {
                 $data = 'config_inactive_reminder';
                 break;
 
-            case 'user_awaiting_renewal_days':
-                if (!is_numeric($text) || $text < 0) {
-                    sendMessage($chat_id, "❌ لطفا فقط یک عدد صحیح (مثبت یا صفر) وارد کنید.");
+            // Note: حذف state handlers قدیمی تمدید: user_awaiting_renewal_days, user_awaiting_renewal_gb و awaiting_renewal_screenshot
+            // سیستم جدید از طریق انتخاب پلن عمل می‌کند
+
+            case 'admin_awaiting_charge_amount':
+                if (!hasPermission($chat_id, 'manage_payment')) {
                     break;
                 }
-                $state_data = $user_data['state_data'];
-                $state_data['renewal_days'] = (int) $text;
-                updateUserData($chat_id, 'user_awaiting_renewal_gb', $state_data);
-
-                $settings = getSettings();
-                $price_gb = number_format($settings['renewal_price_per_gb'] ?? 2000);
-                $message = "<b>تمدید سرویس</b>\n\n" .
-                    "۲. چند **گیگابایت** به حجم سرویس شما اضافه شود؟\n\n" .
-                    "▫️ هزینه هر گیگ: {$price_gb} تومان\n" .
-                    "💡 برای رد شدن و عدم تمدید حجم، عدد `0` را وارد کنید.";
-                sendMessage($chat_id, $message);
-                break;
-
-            case 'user_awaiting_renewal_gb':
-                if (!is_numeric($text) || $text < 0) {
-                    sendMessage($chat_id, "❌ لطفا فقط یک عدد صحیح (مثبت یا صفر) وارد کنید.");
+                if (!is_numeric($text) || $text <= 0) {
+                    sendMessage($chat_id, "❌ لطفا یک مبلغ معتبر (عدد مثبت) به تومان وارد کنید.", $cancelKeyboard);
                     break;
                 }
+                $amount = (int) $text;
                 $state_data = $user_data['state_data'];
-                $days_to_add = $state_data['renewal_days'];
-                $gb_to_add = (int) $text;
+                $user_to_charge_id = $state_data['user_id'];
 
-                if ($days_to_add == 0 && $gb_to_add == 0) {
-                    sendMessage($chat_id, "شما هیچ مقداری برای تمدید وارد نکردید. عملیات لغو شد.");
-                    updateUserData($chat_id, 'main_menu');
+                $user_to_charge = getUser($user_to_charge_id);
+                if (!$user_to_charge) {
+                    sendMessage($chat_id, "❌ کاربری با این شناسه یافت نشد.");
+                    updateUserData($chat_id, 'main_menu', ['admin_view' => 'admin']);
                     handleMainMenu($chat_id, $first_name);
                     break;
                 }
 
-                $settings = getSettings();
-                $cost_days = $days_to_add * (int) ($settings['renewal_price_per_day'] ?? 1000);
-                $cost_gb = $gb_to_add * (int) ($settings['renewal_price_per_gb'] ?? 2000);
-                $total_cost = $cost_days + $cost_gb;
+                $new_balance = $user_to_charge['balance'] + $amount;
+                updateUserBalance($user_to_charge_id, $new_balance);
 
-                $state_data['renewal_gb'] = $gb_to_add;
-                $state_data['renewal_total_cost'] = $total_cost;
-                updateUserData($chat_id, 'user_confirming_renewal', $state_data);
+                sendMessage($chat_id, "✅ مبلغ " . number_format($amount) . " تومان به موجودی کاربر " . htmlspecialchars($user_to_charge['first_name']) . " (<code>{$user_to_charge_id}</code>) اضافه شد.\nموجودی جدید: " . number_format($new_balance) . " تومان.");
+                sendMessage($user_to_charge_id, "✅ مبلغ " . number_format($amount) . " تومان به موجودی حساب شما اضافه شد.\nموجودی جدید: " . number_format($new_balance) . " تومان.");
 
-                $summary = "<b>خلاصه درخواست تمدید شما:</b>\n\n" .
-                    "▫️ افزایش زمان: <b>{$days_to_add} روز</b>\n" .
-                    "▫️ افزایش حجم: <b>{$gb_to_add} گیگابایت</b>\n\n" .
-                    "💰 هزینه کل: <b>" . number_format($total_cost) . " تومان</b>\n\n" .
-                    "موجودی فعلی شما: " . number_format($user_data['balance']) . " تومان\n\n" .
-                    "آیا تایید می‌کنید؟";
-
-                $keyboard = ['inline_keyboard' => [[['text' => '✅ بله، پرداخت کن', 'callback_data' => 'confirm_renewal_payment']]]];
-                sendMessage($chat_id, $summary, $keyboard);
+                updateUserData($chat_id, 'main_menu', ['admin_view' => 'admin']);
+                handleMainMenu($chat_id, $first_name);
                 break;
 
-            case 'awaiting_renewal_screenshot':
-                if (isset($update['message']['photo'])) {
-                    $state_data = $user_data['state_data'];
-                    $photo_id = $update['message']['photo'][count($update['message']['photo']) - 1]['file_id'];
-
-                    $stmt = pdo()->prepare("UPDATE renewal_requests SET photo_file_id = ? WHERE id = ?");
-                    $stmt->execute([$photo_id, $state_data['renewal_request_id']]);
-
-
-                    $request_id = $state_data['renewal_request_id'];
-                    $caption = "<b>درخواست تمدید سرویس جدید</b>\n\n" .
-                        "👤 کاربر: " . htmlspecialchars($first_name) . " (<code>{$chat_id}</code>)\n" .
-                        "▫️ سرویس: <code>{$state_data['renewal_username']}</code>\n" .
-                        "⏰ تمدید زمان: {$state_data['renewal_days']} روز\n" .
-                        "📊 تمدید حجم: {$state_data['renewal_gb']} گیگ\n" .
-                        "💰 هزینه: " . number_format($state_data['renewal_total_cost']) . " تومان\n" .
-                        "▫️ شماره درخواست: #R-{$request_id}";
-
-                    $keyboard = [
-                        'inline_keyboard' => [
-                            [
-                                ['text' => '✅ تایید تمدید', 'callback_data' => "approve_renewal_{$request_id}"],
-                                ['text' => '❌ رد تمدید', 'callback_data' => "reject_renewal_{$request_id}"]
-                            ]
-                        ]
-                    ];
-
-                    $all_admins = getAdmins();
-                    $all_admins[ADMIN_CHAT_ID] = [];
-                    foreach (array_keys($all_admins) as $admin_id) {
-                        if (hasPermission($admin_id, 'manage_payment')) {
-                            sendPhoto($admin_id, $photo_id, $caption, $keyboard);
-                        }
-                    }
-
-                    sendMessage($chat_id, "✅ رسید شما برای ادمین ارسال شد. پس از بررسی، سرویس شما تمدید خواهد شد.");
-                    updateUserData($chat_id, 'main_menu');
-                    handleMainMenu($chat_id, $first_name);
+            case 'admin_awaiting_deduct_amount':
+                if (!hasPermission($chat_id, 'manage_payment')) {
+                    break;
                 }
+                if (!is_numeric($text) || $text <= 0) {
+                    sendMessage($chat_id, "❌ لطفا یک مبلغ معتبر (عدد مثبت) به تومان وارد کنید.", $cancelKeyboard);
+                    break;
+                }
+                $amount = (int) $text;
+                $state_data = $user_data['state_data'];
+                $user_to_deduct_id = $state_data['user_id'];
+
+                $user_to_deduct = getUser($user_to_deduct_id);
+                if (!$user_to_deduct) {
+                    sendMessage($chat_id, "❌ کاربری با این شناسه یافت نشد.");
+                    updateUserData($chat_id, 'main_menu', ['admin_view' => 'admin']);
+                    handleMainMenu($chat_id, $first_name);
+                    break;
+                }
+
+                $new_balance = $user_to_deduct['balance'] - $amount;
+                if ($new_balance < 0) {
+                    $new_balance = 0; // Ensure balance doesn't go negative
+                }
+                updateUserBalance($user_to_deduct_id, $new_balance);
+
+                sendMessage($chat_id, "✅ مبلغ " . number_format($amount) . " تومان از موجودی کاربر " . htmlspecialchars($user_to_deduct['first_name']) . " (<code>{$user_to_deduct_id}</code>) کسر شد.\nموجودی جدید: " . number_format($new_balance) . " تومان.");
+                sendMessage($user_to_deduct_id, "❌ مبلغ " . number_format($amount) . " تومان از موجودی حساب شما کسر شد.\nموجودی جدید: " . number_format($new_balance) . " تومان.");
+
+                updateUserData($chat_id, 'main_menu', ['admin_view' => 'admin']);
+                handleMainMenu($chat_id, $first_name);
                 break;
         }
         die;

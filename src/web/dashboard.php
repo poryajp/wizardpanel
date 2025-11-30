@@ -20,48 +20,57 @@ if (isset($_GET['logout'])) {
 // Get statistics
 $stats = [];
 
-// Total users
-$stmt = pdo()->query("SELECT COUNT(*) FROM users");
-$stats['total_users'] = $stmt->fetchColumn();
+try {
+    // Total users
+    $stmt = pdo()->query("SELECT COUNT(*) FROM users");
+    $stats['total_users'] = $stmt->fetchColumn();
 
-// Active users
-$stmt = pdo()->query("SELECT COUNT(*) FROM users WHERE status = 'active'");
-$stats['active_users'] = $stmt->fetchColumn();
+    // Active users
+    $stmt = pdo()->query("SELECT COUNT(*) FROM users WHERE status = 'active'");
+    $stats['active_users'] = $stmt->fetchColumn();
 
-// Total services
-$stmt = pdo()->query("SELECT COUNT(*) FROM services");
-$stats['total_services'] = $stmt->fetchColumn();
+    // Total services
+    $stmt = pdo()->query("SELECT COUNT(*) FROM services");
+    $stats['total_services'] = $stmt->fetchColumn();
 
-// Today income
-$today_income = pdo()
-    ->query("SELECT SUM(p.price) FROM services s JOIN plans p ON s.plan_id = p.id WHERE DATE(s.purchase_date) = CURDATE()")
-    ->fetchColumn() ?? 0;
-$stats['today_income'] = $today_income;
+    // Today income
+    $today_income = pdo()
+        ->query("SELECT SUM(p.price) FROM services s JOIN plans p ON s.plan_id = p.id WHERE DATE(s.purchase_date) = CURDATE()")
+        ->fetchColumn() ?? 0;
+    $stats['today_income'] = $today_income;
 
-// Month income
-$month_income = pdo()
-    ->query("SELECT SUM(p.price) FROM services s JOIN plans p ON s.plan_id = p.id WHERE MONTH(s.purchase_date) = MONTH(CURDATE()) AND YEAR(s.purchase_date) = YEAR(CURDATE())")
-    ->fetchColumn() ?? 0;
-$stats['month_income'] = $month_income;
+    // Month income
+    $month_income = pdo()
+        ->query("SELECT SUM(p.price) FROM services s JOIN plans p ON s.plan_id = p.id WHERE MONTH(s.purchase_date) = MONTH(CURDATE()) AND YEAR(s.purchase_date) = YEAR(CURDATE())")
+        ->fetchColumn() ?? 0;
+    $stats['month_income'] = $month_income;
 
-// Total servers
-$stmt = pdo()->query("SELECT COUNT(*) FROM servers WHERE status = 'active'");
-$stats['total_servers'] = $stmt->fetchColumn();
+    // Total servers
+    $stmt = pdo()->query("SELECT COUNT(*) FROM servers WHERE status = 'active'");
+    $stats['total_servers'] = $stmt->fetchColumn();
 
-// Pending payments
-$stmt = pdo()->query("SELECT COUNT(*) FROM payment_requests WHERE status = 'pending'");
-$stats['pending_payments'] = $stmt->fetchColumn();
+    // Pending payments - Handle if table doesn't exist
+    try {
+        $stmt = pdo()->query("SELECT COUNT(*) FROM payment_requests WHERE status = 'pending'");
+        $stats['pending_payments'] = $stmt->fetchColumn();
+    } catch (Exception $e) {
+        $stats['pending_payments'] = 0;
+    }
 
-// Recent services (last 5)
-$stmt = pdo()->query("
-    SELECT s.*, p.name as plan_name, u.first_name 
-    FROM services s 
-    JOIN plans p ON s.plan_id = p.id 
-    JOIN users u ON s.owner_chat_id = u.chat_id 
-    ORDER BY s.id DESC 
-    LIMIT 5
-");
-$recent_services = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    // Recent services (last 5)
+    $stmt = pdo()->query("
+        SELECT s.*, p.name as plan_name, u.first_name 
+        FROM services s 
+        JOIN plans p ON s.plan_id = p.id 
+        JOIN users u ON s.owner_chat_id = u.chat_id 
+        ORDER BY s.id DESC 
+        LIMIT 5
+    ");
+    $recent_services = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+} catch (Exception $e) {
+    die("Error loading dashboard: " . $e->getMessage());
+}
 
 renderHeader('داشبورد');
 ?>

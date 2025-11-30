@@ -1,38 +1,43 @@
-const tg = window.Telegram.WebApp;
+// Helper Functions for Telegram Web App Panel
 
-// Initialize Telegram Web App
-function initApp() {
-    tg.expand();
-
-    // Set theme
-    document.documentElement.setAttribute('data-theme', tg.colorScheme);
-
-    // Listen for theme changes
-    tg.onEvent('themeChanged', function () {
-        document.documentElement.setAttribute('data-theme', tg.colorScheme);
-    });
-
-    // Main button setup
-    tg.MainButton.setParams({
-        text: 'بستن پنل',
-        is_visible: false
-    });
-}
-
-// Show loading
 function showLoading() {
-    document.querySelector('.loading-overlay').style.display = 'flex';
+    const loading = document.getElementById('loading');
+    if (loading) {
+        loading.style.display = 'flex';
+    }
 }
 
-// Hide loading
 function hideLoading() {
-    document.querySelector('.loading-overlay').style.display = 'none';
+    const loading = document.getElementById('loading');
+    if (loading) {
+        loading.style.display = 'none';
+    }
 }
 
-// Format price
 function formatPrice(price) {
     return new Intl.NumberFormat('fa-IR').format(price) + ' تومان';
 }
 
-// Initialize
-document.addEventListener('DOMContentLoaded', initApp);
+function formatNumber(num) {
+    return new Intl.NumberFormat('fa-IR').format(num);
+}
+
+function formatBytes(bytes) {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+}
+
+// Jalali Date Helper (Simple implementation)
+function jdate(format, timestamp) {
+    // This is a simplified version
+    // For production, use a proper Jalali date library
+    const date = new Date(timestamp * 1000);
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+
+    return `${year}/${month}/${day}`;
+}

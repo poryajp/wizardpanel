@@ -4,6 +4,18 @@ requireUserLogin();
 
 $user = getCurrentUser();
 $services = getUserServices($user['chat_id']);
+
+// Sort by expire date (active first)
+usort($services, function ($a, $b) {
+    $now = time();
+    $a_expired = $a['expire_timestamp'] < $now;
+    $b_expired = $b['expire_timestamp'] < $now;
+
+    if ($a_expired != $b_expired) {
+        return $a_expired ? 1 : -1;
+    }
+    return $b['expire_timestamp'] - $a['expire_timestamp'];
+});
 ?>
 <!DOCTYPE html>
 <html lang="fa" dir="rtl">
@@ -28,77 +40,86 @@ $services = getUserServices($user['chat_id']);
                 </a>
                 <h2 style="margin-right: 12px;">سرویس‌های من</h2>
             </div>
-            <div class="wallet-badge">
-                <span class="text-primary"><?php echo count($services); ?> سرویس</span>
-            </div>
         </div>
 
         <?php if (empty($services)): ?>
-            <div style="text-align: center; padding: 60px 20px; color: var(--text-muted);">
-                <i class="fas fa-box-open" style="font-size: 64px; margin-bottom: 20px; opacity: 0.4;"></i>
-                <h3 style="margin-bottom: 12px;">هیچ سرویسی ندارید</h3>
-                <p style="margin-bottom: 24px;">برای خرید سرویس به فروشگاه مراجعه کنید.</p>
-                <a href="shop.php" class="btn btn-primary" style="display: inline-block;">
-                    <i class="fas fa-shopping-cart"></i> خرید سرویس
-                </a>
+            <div class="card">
+                <div style="text-align: center; padding: 40px 20px; color: var(--text-muted);">
+                    <i class="fas fa-inbox" style="font-size: 48px; margin-bottom: 16px; opacity: 0.5;"></i>
+                    <p style="margin-bottom: 16px;">شما هیچ سرویسی ندارید.</p>
+                    <a href="shop.php" class="btn btn-primary" style="text-decoration: none; display: inline-block;">
+                        <i class="fas fa-shopping-cart"></i> خرید سرویس
+                    </a>
+                </div>
             </div>
         <?php else: ?>
-            <?php foreach ($services as $service): ?>
-                <div class="card">
+            <?php
+            $now = time();
+            foreach ($services as $service):
+                $is_expired = $service['expire_timestamp'] < $now;
+                $status_color = $is_expired ? 'var(--danger-color)' : 'var(--success-color)';
+                $status_icon = $is_expired ? 'fa-times-circle' : 'fa-check-circle';
+                $status_text = $is_expired ? 'منقضی' : 'فعال';
+                $expire_date = date('Y/m/d', $service['expire_timestamp']);
+                $days_left = ceil(($service['expire_timestamp'] - $now) / 86400);
+                ?>
+                <div class="card" style="margin-bottom: 12px;">
                     <div class="card-header">
-                        <div class="card-title">
-                            <i class="fas fa-server text-primary"></i> <?php echo htmlspecialchars($service['plan_name']); ?>
-                        </div>
-                        <span class="text-success" style="font-size: 0.85rem; font-weight: 500;">
-                            <i class="fas fa-circle" style="font-size: 0.5rem;"></i> فعال
-                        </span>
-                    </div>
-
-                    <div style="margin-bottom: 16px;">
-                        <div
-                            style="display: flex; justify-content: space-between; margin-bottom: 10px; padding: 8px; background: var(--bg-color); border-radius: 6px;">
-                            <span class="text-muted" style="font-size: 0.9rem;">
-                                <i class="fas fa-user"></i> نام کاربری:
-                            </span>
-                            <span style="font-family: monospace; font-weight: 500;">
-                                <?php echo $service['marzban_username']; ?>
-                            </span>
-                        </div>
-                        <div style="display: flex; justify-content: space-between; margin-bottom: 10px; padding: 8px;">
-                            <span class="text-muted" style="font-size: 0.9rem;">
-                                <i class="fas fa-calendar-alt"></i> تاریخ انقضا:
-                            </span>
-                            <span style="font-weight: 500;">
-                                <?php echo $service['expire_timestamp'] ? date('Y/m/d', $service['expire_timestamp']) : 'نامحدود'; ?>
-                            </span>
-                        </div>
-                        <div
-                            style="display: flex; justify-content: space-between; padding: 8px; background: var(--bg-color); border-radius: 6px;">
-                            <span class="text-muted" style="font-size: 0.9rem;">
-                                <i class="fas fa-database"></i> حجم مصرفی:
-                            </span>
-                            <span style="font-weight: 500;">
-                                <?php echo formatBytes($service['used_traffic'] ?? 0); ?> /
-                                <?php echo $service['data_limit'] ? formatBytes($service['data_limit']) : 'نامحدود'; ?>
-                            </span>
+                        <div class="card-title"><?php echo htmlspecialchars($service['custom_name']); ?></div>
+                        <div style="color: <?php echo $status_color; ?>; font-size: 0.9rem;">
+                            <i class="fas <?php echo $status_icon; ?>"></i>
+                            <?php echo $status_text; ?>
                         </div>
                     </div>
 
-                    <?php if (!empty($service['sub_link'])): ?>
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                            <button class="btn btn-primary"
-                                onclick="copyLink('<?php echo htmlspecialchars($service['sub_link'], ENT_QUOTES); ?>')">
+                    <div style="margin-bottom: 12px;">
+                        <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 8px;">
+                            <div style="margin-bottom: 4px;">
+                                <i class="fas fa-tag"></i>
+                                پلن: <?php echo htmlspecialchars($service['plan_name']); ?>
+                            </div>
+                            <div style="margin-bottom: 4px;">
+                                <i class="fas fa-calendar"></i>
+                                تاریخ انقضا: <?php echo $expire_date; ?>
+                                <?php if (!$is_expired && $days_left > 0): ?>
+                                    <span
+                                        style="color: <?php echo $days_left <= 3 ? 'var(--danger-color)' : 'var(--text-muted)'; ?>;">
+                                        (<?php echo $days_left; ?> روز مانده)
+                                    </span>
+                                <?php endif; ?>
+                            </div>
+                            <div>
+                                <i class="fas fa-hdd"></i>
+                                حجم: <?php echo $service['volume_gb']; ?> GB
+                            </div>
+                        </div>
+                    </div>
+
+                    <?php if (!empty($service['sub_url'])): ?>
+                        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px;">
+                            <button class="btn btn-sm btn-outline"
+                                onclick="copyLink('<?php echo htmlspecialchars($service['sub_url'], ENT_QUOTES); ?>')">
                                 <i class="fas fa-copy"></i> کپی لینک
                             </button>
-                            <button class="btn btn-outline"
-                                onclick="showQr('<?php echo htmlspecialchars($service['sub_link'], ENT_QUOTES); ?>')">
-                                <i class="fas fa-qrcode"></i> QR کد
+                            <button class="btn btn-sm btn-outline"
+                                onclick="openLink('<?php echo htmlspecialchars($service['sub_url'], ENT_QUOTES); ?>')">
+                                <i class="fas fa-external-link-alt"></i> باز کردن
                             </button>
+                            <button class="btn btn-sm btn-outline"
+                                onclick="showQR('<?php echo htmlspecialchars($service['sub_url'], ENT_QUOTES); ?>')">
+                                <i class="fas fa-qrcode"></i> QR Code
+                            </button>
+                            <a href="renew.php?username=<?php echo htmlspecialchars($service['marzban_username'], ENT_QUOTES); ?>"
+                                class="btn btn-sm btn-primary"
+                                style="text-decoration: none; display: flex; align-items: center; justify-content: center;">
+                                <i class="fas fa-sync-alt" style="margin-left: 5px;"></i> تمدید
+                            </a>
                         </div>
                     <?php else: ?>
                         <div
-                            style="padding: 12px; background: #fff3cd; border-radius: 8px; text-align: center; font-size: 0.9rem; color: #856404;">
-                            <i class="fas fa-exclamation-triangle"></i> لینک اشتراک موجود نیست
+                            style="text-align: center; padding: 8px; background: var(--bg-secondary); border-radius: var(--radius); font-size: 0.85rem; color: var(--text-muted);">
+                            <i class="fas fa-exclamation-triangle"></i>
+                            لینک اشتراک در دسترس نیست
                         </div>
                     <?php endif; ?>
                 </div>
@@ -106,21 +127,15 @@ $services = getUserServices($user['chat_id']);
         <?php endif; ?>
     </div>
 
-    <!-- QR Modal -->
-    <div id="qr-modal" class="loading-overlay" style="display: none; background: rgba(0,0,0,0.9);">
-        <div class="card" style="width: 90%; max-width: 320px; position: relative;">
-            <i class="fas fa-times" onclick="closeQr()"
-                style="position: absolute; top: 12px; right: 12px; cursor: pointer; font-size: 1.3rem; color: var(--text-muted); z-index: 10;"></i>
-            <div style="text-align: center; padding: 24px 16px;">
-                <h3 style="margin-bottom: 16px; font-size: 1.1rem;">
-                    <i class="fas fa-qrcode text-primary"></i> QR Code
-                </h3>
-                <div style="background: white; padding: 16px; border-radius: 12px; display: inline-block;">
-                    <img id="qr-image" src="" alt="QR Code" style="width: 250px; height: 250px; border-radius: 8px;">
-                </div>
-                <p style="margin-top: 16px; font-size: 0.9rem; color: var(--text-muted);">
-                    <i class="fas fa-mobile-alt"></i> با تلفن همراه اسکن کنید
-                </p>
+    <!-- QR Code Modal -->
+    <div id="qr-modal" class="loading-overlay" style="display: none; background: rgba(0,0,0,0.5);">
+        <div class="card" style="width: 90%; max-width: 350px;">
+            <div class="card-header">
+                <div class="card-title">QR Code اشتراک</div>
+                <i class="fas fa-times" onclick="closeQRModal()" style="cursor: pointer;"></i>
+            </div>
+            <div id="qr-content" style="text-align: center; padding: 20px;">
+                <!-- QR Code will be inserted here -->
             </div>
         </div>
     </div>
@@ -150,47 +165,27 @@ $services = getUserServices($user['chat_id']);
     </div>
 
     <script src="assets/js/app.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
     <script>
         const tg = window.Telegram.WebApp;
+        tg.ready();
+        tg.expand();
 
-        // Show back button
-        if (tg.BackButton) {
-            tg.BackButton.show();
-            tg.BackButton.onClick(function () {
-                window.location.href = 'index.php';
-            });
-        }
-
-        function copyLink(link) {
-            if (!link) {
-                alert('لینک موجود نیست');
-                return;
-            }
-
-            // Try multiple methods for better compatibility
+        function copyLink(url) {
             if (navigator.clipboard && navigator.clipboard.writeText) {
-                navigator.clipboard.writeText(link)
+                navigator.clipboard.writeText(url)
                     .then(() => {
-                        if (tg.showPopup) {
-                            tg.showPopup({
-                                title: 'موفقیت‌آمیز',
-                                message: 'لینک اشتراک کپی شد',
-                                buttons: [{ type: 'ok' }]
-                            });
-                        } else {
-                            alert('لینک اشتراک کپی شد');
-                        }
+                        tg.showPopup({
+                            message: '✓ لینک اشتراک کپی شد'
+                        });
                     })
-                    .catch(() => {
-                        fallbackCopy(link);
-                    });
+                    .catch(() => fallbackCopy(url));
             } else {
-                fallbackCopy(link);
+                fallbackCopy(url);
             }
         }
 
         function fallbackCopy(text) {
-            // Create temporary textarea
             const textarea = document.createElement('textarea');
             textarea.value = text;
             textarea.style.position = 'fixed';
@@ -199,49 +194,69 @@ $services = getUserServices($user['chat_id']);
 
             try {
                 textarea.select();
-                textarea.setSelectionRange(0, 99999); // For mobile
                 const success = document.execCommand('copy');
-
                 if (success) {
-                    if (tg.showPopup) {
-                        tg.showPopup({
-                            message: 'لینک اشتراک کپی شد ✓'
-                        });
-                    } else {
-                        alert('لینک اشتراک کپی شد ✓');
-                    }
+                    tg.showPopup({ message: '✓ لینک اشتراک کپی شد' });
                 } else {
-                    // Show link in alert as last resort
-                    prompt('لینک اشتراک (کپی کنید):', text);
+                    prompt('لینک اشتراک را کپی کنید:', text);
                 }
-            } catch (err) {
-                prompt('لینک اشتراک (کپی کنید):', text);
             } finally {
                 document.body.removeChild(textarea);
             }
         }
 
-        function showQr(link) {
-            if (!link) {
-                alert('لینک موجود نیست');
-                return;
+        function openLink(url) {
+            try {
+                tg.openLink(url);
+            } catch (e) {
+                // Fallback
+                window.open(url, '_blank');
             }
+        }
 
-            const qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=' + encodeURIComponent(link);
-            document.getElementById('qr-image').src = qrUrl;
+        function showQR(url) {
+            const qrContent = document.getElementById('qr-content');
+            qrContent.innerHTML = '<div id="qrcode"></div>';
+
+            QRCode.toCanvas(url, {
+                errorCorrectionLevel: 'M',
+                width: 250,
+                margin: 2
+            }, (err, canvas) => {
+                if (err) {
+                    qrContent.innerHTML = '<p style="color: var(--danger-color);">خطا در ایجاد QR Code</p>';
+                } else {
+                    qrContent.innerHTML = '';
+                    qrContent.appendChild(canvas);
+                }
+            });
+
             document.getElementById('qr-modal').style.display = 'flex';
         }
 
-        function closeQr() {
+        function closeQRModal() {
             document.getElementById('qr-modal').style.display = 'none';
         }
 
-        // Close modal on background click
-        document.getElementById('qr-modal')?.addEventListener('click', function (e) {
-            if (e.target === this) {
-                closeQr();
-            }
-        });
+        function showDetails(username) {
+            // TODO: Navigate to service detail page
+            tg.showAlert('صفحه جزئیات در حال توسعه است');
+        }
+
+        // Theme
+        if (tg.colorScheme === 'dark') {
+            document.body.classList.add('dark-theme');
+        }
+
+        // Check for success message in URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const successMsg = urlParams.get('success_msg');
+        if (successMsg) {
+            tg.showAlert(successMsg);
+            // Clean URL
+            const newUrl = window.location.pathname;
+            window.history.replaceState({}, document.title, newUrl);
+        }
     </script>
 </body>
 

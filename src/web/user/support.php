@@ -4,13 +4,84 @@ requireUserLogin();
 
 $user = getCurrentUser();
 $settings = getSettings();
+
+// تعریف ثابت USER_INLINE_KEYBOARD برای جلوگیری از خطا
+if (!defined('USER_INLINE_KEYBOARD')) {
+    define('USER_INLINE_KEYBOARD', ($settings['inline_keyboard'] ?? 'on') === 'on');
+}
+
+// تعریف ثابت ADMIN_CHAT_ID اگر در کانفیگ وجود داشته باشد
+if (!defined('ADMIN_CHAT_ID')) {
+    require_once __DIR__ . '/../../includes/config.php';
+    $admin_chat_id = $config['telegram']['admin_chat_id'] ?? 12345678;
+    define('ADMIN_CHAT_ID', $admin_chat_id);
+}
+
+// Handle ticket submission
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'send_ticket') {
+    header('Content-Type: application/json');
+
+    $subject = trim($_POST['subject']);
+    $message = trim($_POST['message']);
+
+    if (empty($subject) || empty($message)) {
+        echo json_encode(['success' => false, 'message' => 'موضوع و متن پیام نمی‌تواند خالی باشد']);
+        exit;
+    }
+
+    // Send to admin via bot
+    require_once __DIR__ . '/../../includes/functions.php';
+
+    $ticket_message = "📨 تیکت پشتیبانی جدید\n\n" .
+        "👤 کاربر: " . htmlspecialchars($user['first_name']) . "\n" .
+        "🆔 شناسه: <code>{$user['chat_id']}</code>\n" .
+        "📋 موضوع: " . htmlspecialchars($subject) . "\n\n" .
+        "💬 پیام: \n" . htmlspecialchars($message);
+
+    // Get all admins
+    $admins = getAdmins();
+    $admins[ADMIN_CHAT_ID] = [];
+
+    // Insert into tickets table BEFORE sending
+    $ticket_id = uniqid('ticket_', true);
+    $stmt = pdo()->prepare("INSERT INTO tickets (id, user_id, user_name, subject, status, created_at) VALUES (?, ?, ?, ?, 'open', NOW())");
+    $stmt->execute([$ticket_id, $user['chat_id'], $user['first_name'], $subject]);
+
+    $stmt_conv = pdo()->prepare("INSERT INTO ticket_conversations (ticket_id, sender, message_text, sent_at) VALUES (?, 'user', ?, NOW())");
+    $stmt_conv->execute([$ticket_id, $message]);
+
+    $keyboard = [
+        'inline_keyboard' => [
+            [
+                ['text' => '💬 پاسخ', 'callback_data' => "reply_ticket_{$ticket_id}"]
+            ]
+        ]
+    ];
+
+    $sent = false;
+    foreach (array_keys($admins) as $admin_id) {
+        if (hasPermission($admin_id, 'manage_users')) {
+            $result = sendMessage($admin_id, $ticket_message, $keyboard);
+            if ($result) {
+                $sent = true;
+            }
+        }
+    }
+
+    if ($sent) {
+        echo json_encode(['success' => true, 'message' => 'پیام شما برای پشتیبانی ارسال شد']);
+    } else {
+        echo json_encode(['success' => false, 'message' => 'خطا در ارسال پیام. لطفاً با آیدی تلگرام تماس بگیرید.']);
+    }
+    exit;
+}
 ?>
 <!DOCTYPE html>
 <html lang="fa" dir="rtl">
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>پشتیبانی</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
@@ -20,6 +91,10 @@ $settings = getSettings();
 </head>
 
 <body>
+    <div id="loading" class="loading-overlay" style="display: none;">
+        <div class="spinner"></div>
+    </div>
+
     <div class="container">
         <div class="header">
             <div class="user-profile">
@@ -30,88 +105,86 @@ $settings = getSettings();
             </div>
         </div>
 
-        <!-- Support Card -->
-        <div class="card">
-            <div class="card-header">
-                <div class="card-title">
-                    <i class="fas fa-headset text-primary"></i> تماس با پشتیبانی
-                </div>
-            </div>
-
+        <!-- Contact Info Card -->
+        <div class="card"
+            style="margin-bottom: 16px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
             <div style="padding: 20px; text-align: center;">
-                <div style="font-size: 3rem; margin-bottom: 20px;">
-                    <i class="fab fa-telegram" style="color: #0088cc;"></i>
-                </div>
-
-                <p style="margin-bottom: 20px; color: var(--text-muted);">
-                    برای دریافت پشتیبانی، ارسال رسید پرداخت یا گزارش مشکل، با ما در تلگرام در ارتباط باشید.
-                </p>
-
-                <button class="btn btn-primary" onclick="openSupport()">
-                    <i class="fab fa-telegram"></i> ارتباط با پشتیبانی
-                </button>
+                <i class="fas fa-headset" style="font-size: 3rem; margin-bottom: 12px; opacity: 0.9;"></i>
+                <h3 style="margin-bottom: 12px;">پشتیبانی ۲۴ ساعته</h3>
+                <?php if (!empty($settings['support_username'])): ?>
+                    <a href="https://t.me/<?php echo $settings['support_username']; ?>" class="btn"
+                        style="background: white; color: #667eea; text-decoration: none; display: inline-block; margin-top: 8px;">
+                        <i class="fab fa-telegram"></i>
+                        @<?php echo $settings['support_username']; ?>
+                    </a>
+                <?php endif; ?>
             </div>
         </div>
 
-        <!-- User Info Card -->
+        <!-- Ticket Form -->
         <div class="card">
             <div class="card-header">
-                <div class="card-title">
-                    <i class="fas fa-user text-success"></i> اطلاعات شما
-                </div>
+                <div class="card-title">ارسال تیکت پشتیبانی</div>
             </div>
+            <div style="padding: 16px;">
+                <form id="ticket-form" onsubmit="sendTicket(event)">
+                    <div style="margin-bottom: 16px;">
+                        <label style="display: block; margin-bottom: 8px; font-weight: 600;">موضوع:</label>
+                        <input type="text" id="subject" class="form-control" placeholder="موضوع تیکت را وارد کنید"
+                            required
+                            style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: var(--radius); font-family: inherit;">
+                    </div>
 
-            <div style="padding: 15px;">
-                <div style="margin-bottom: 12px;">
-                    <strong>نام:</strong> <?php echo htmlspecialchars($user['first_name']); ?>
-                </div>
-                <div style="margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
-                    <strong>شناسه کاربری:</strong>
-                    <div>
-                        <code
-                            style="background: var(--bg-color); padding: 4px 8px; border-radius: 4px;"><?php echo $user['chat_id']; ?></code>
-                        <i class="fas fa-copy text-primary" onclick="copyText('<?php echo $user['chat_id']; ?>')"
-                            style="cursor: pointer; margin-right: 8px;"></i>
+                    <div style="margin-bottom: 16px;">
+                        <label style="display: block; margin-bottom: 8px; font-weight: 600;">پیام:</label>
+                        <textarea id="message" class="form-control" placeholder="پیام خود را بنویسید..." required
+                            rows="6"
+                            style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: var(--radius); font-family: inherit; resize: vertical;"></textarea>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary" style="width: 100%;">
+                        <i class="fas fa-paper-plane"></i>
+                        ارسال تیکت
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- FAQ Section -->
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">سوالات متداول</div>
+            </div>
+            <div style="padding: 16px;">
+                <div style="margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px solid var(--border-color);">
+                    <div style="font-weight: 600; margin-bottom: 8px;">
+                        <i class="fas fa-question-circle text-primary"></i>
+                        چگونه سرویس خریداری کنم؟
+                    </div>
+                    <div style="font-size: 0.9rem; color: var(--text-muted);">
+                        از بخش فروشگاه، دسته‌بندی، سرور و پلن مورد نظر را انتخاب کنید و پس از پرداخت، سرویس برای شما
+                        ساخته می‌شود.
                     </div>
                 </div>
-                <div>
-                    <strong>موجودی:</strong> <span class="text-success"><?php echo number_format($user['balance']); ?>
-                        تومان</span>
-                </div>
-                <p style="margin-top: 15px; font-size: 0.85rem; color: var(--text-muted);">
-                    💡 لطفاً شناسه کاربری خود را هنگام تماس با پشتیبانی ارسال کنید.
-                </p>
-            </div>
-        </div>
 
-        <!-- FAQ -->
-        <div class="card">
-            <div class="card-header">
-                <div class="card-title">
-                    <i class="fas fa-question-circle text-warning"></i> سوالات متداول
-                </div>
-            </div>
-
-            <div style="padding: 15px;">
-                <div style="margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px solid var(--border-color);">
-                    <strong>چگونه سرویس خریداری کنم؟</strong>
-                    <p style="margin-top: 8px; color: var(--text-muted); font-size: 0.9rem;">
-                        از بخش فروشگاه، دسته‌بندی و پلن مورد نظر را انتخاب کنید و پس از پرداخت، سرویس شما فعال می‌شود.
-                    </p>
-                </div>
-
-                <div style="margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px solid var(--border-color);">
-                    <strong>چگونه موجودی کیف پول را شارژ کنم؟</strong>
-                    <p style="margin-top: 8px; color: var(--text-muted); font-size: 0.9rem;">
-                        از بخش کیف پول، مبلغ مورد نظر را وارد کرده و روش پرداخت را انتخاب کنید.
-                    </p>
+                <div style="margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px solid var(--border-color);">
+                    <div style="font-weight: 600; margin-bottom: 8px;">
+                        <i class="fas fa-question-circle text-primary"></i>
+                        چگونه کیف پول را شارژ کنم؟
+                    </div>
+                    <div style="font-size: 0.9rem; color: var(--text-muted);">
+                        از بخش کیف پول می‌توانید با درگاه آنلاین یا کارت به کارت، حساب خود را شارژ کنید.
+                    </div>
                 </div>
 
                 <div>
-                    <strong>چگونه از سرویس خریداری شده استفاده کنم؟</strong>
-                    <p style="margin-top: 8px; color: var(--text-muted); font-size: 0.9rem;">
-                        از بخش "سرویس‌های من" می‌توانید لینک اشتراک و QR Code سرویس خود را مشاهده کنید.
-                    </p>
+                    <div style="font-weight: 600; margin-bottom: 8px;">
+                        <i class="fas fa-question-circle text-primary"></i>
+                        لینک اشتراک چیست؟
+                    </div>
+                    <div style="font-size: 0.9rem; color: var(--text-muted);">
+                        لینک اشتراک (Subscription) را در برنامه‌های V2Ray خود وارد کنید تا به سرویس متصل شوید.
+                    </div>
                 </div>
             </div>
         </div>
@@ -144,22 +217,54 @@ $settings = getSettings();
     <script src="assets/js/app.js"></script>
     <script>
         const tg = window.Telegram.WebApp;
+        tg.ready();
+        tg.expand();
 
-        function openSupport() {
-            <?php if (!empty($settings['support_id'])): ?>
-                const support_username = '<?php echo str_replace('@', '', $settings['support_id']); ?>';
-                tg.openTelegramLink('https://t.me/' + support_username);
-            <?php else: ?>
-                alert('اطلاعات پشتیبانی تنظیم نشده است');
-            <?php endif; ?>
+        function sendTicket(event) {
+            event.preventDefault();
+
+            const subject = document.getElementById('subject').value.trim();
+            const message = document.getElementById('message').value.trim();
+
+            if (!subject || !message) {
+                tg.showAlert('لطفاً تمام فیلدها را پر کنید');
+                return;
+            }
+
+            showLoading();
+
+            fetch('support.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: `action=send_ticket&subject=${encodeURIComponent(subject)}&message=${encodeURIComponent(message)}`
+            })
+                .then(response => response.json())
+                .then(data => {
+                    hideLoading();
+                    if (data.success) {
+                        tg.showPopup({
+                            title: 'موفقیت‌آمیز',
+                            message: data.message,
+                            buttons: [{ type: 'ok' }]
+                        }, function () {
+                            document.getElementById('ticket-form').reset();
+                        });
+                    } else {
+                        tg.showAlert(data.message || 'خطا در ارسال تیکت');
+                    }
+                })
+                .catch(error => {
+                    hideLoading();
+                    console.error('Error:', error);
+                    tg.showAlert('خطا در ارتباط با سرور');
+                });
         }
 
-        function copyText(text) {
-            navigator.clipboard.writeText(text).then(() => {
-                tg.showPopup({ message: 'کپی شد' });
-            }).catch(() => {
-                alert('شناسه کاربری: ' + text);
-            });
+        // Theme
+        if (tg.colorScheme === 'dark') {
+            document.body.classList.add('dark-theme');
         }
     </script>
 </body>

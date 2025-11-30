@@ -124,7 +124,12 @@ function forwardMessage($to_chat_id, $from_chat_id, $message_id)
 
 function sendPhoto($chat_id, $photo, $caption, $keyboard = null)
 {
-    $params = ['chat_id' => $chat_id, 'photo' => $photo, 'caption' => $caption, 'reply_markup' => handleKeyboard($keyboard), 'parse_mode' => 'HTML'];
+    $params = ['chat_id' => $chat_id, 'caption' => $caption, 'reply_markup' => handleKeyboard($keyboard), 'parse_mode' => 'HTML'];
+    if (file_exists($photo)) {
+        $params['photo'] = new CURLFile($photo);
+    } else {
+        $params['photo'] = $photo;
+    }
     return apiRequest('sendPhoto', $params);
 }
 
@@ -166,10 +171,21 @@ function apiRequest($method, $params = [])
 
     $url = 'https://api.telegram.org/bot' . BOT_TOKEN . '/' . $method;
     $ch = curl_init();
+
+    $hasFile = false;
+    foreach ($params as $key => $value) {
+        if ($value instanceof CURLFile) {
+            $hasFile = true;
+            break;
+        }
+    }
+
+    $postFields = $hasFile ? $params : http_build_query($params);
+
     curl_setopt_array($ch, [
         CURLOPT_URL => $url,
         CURLOPT_POST => true,
-        CURLOPT_POSTFIELDS => http_build_query($params),
+        CURLOPT_POSTFIELDS => $postFields,
         CURLOPT_RETURNTRANSFER => true,
     ]);
     $response = curl_exec($ch);
@@ -603,22 +619,29 @@ function formatBytes($bytes, $precision = 2)
 function calculateIncomeStats()
 {
     $stats = [
-        'today' =>
-            pdo()
-                ->query("SELECT SUM(p.price) FROM services s JOIN plans p ON s.plan_id = p.id WHERE DATE(s.purchase_date) = CURDATE()")
-                ->fetchColumn() ?? 0,
-        'week' =>
-            pdo()
-                ->query("SELECT SUM(p.price) FROM services s JOIN plans p ON s.plan_id = p.id WHERE s.purchase_date >= CURDATE() - INTERVAL 7 DAY")
-                ->fetchColumn() ?? 0,
-        'month' =>
-            pdo()
-                ->query("SELECT SUM(p.price) FROM services s JOIN plans p ON s.plan_id = p.id WHERE MONTH(s.purchase_date) = MONTH(CURDATE()) AND YEAR(s.purchase_date) = YEAR(CURDATE())")
-                ->fetchColumn() ?? 0,
-        'year' =>
-            pdo()
-                ->query("SELECT SUM(p.price) FROM services s JOIN plans p ON s.plan_id = p.id WHERE YEAR(s.purchase_date) = YEAR(CURDATE())")
-                ->fetchColumn() ?? 0,
+        'today' => (
+            pdo()->query("SELECT SUM(p.price) FROM services s JOIN plans p ON s.plan_id = p.id WHERE DATE(s.purchase_date) = CURDATE()")->fetchColumn() ?? 0
+        ) + (
+            pdo()->query("SELECT SUM(amount) FROM renewals WHERE DATE(renewal_date) = CURDATE()")->fetchColumn() ?? 0
+        ),
+
+        'week' => (
+            pdo()->query("SELECT SUM(p.price) FROM services s JOIN plans p ON s.plan_id = p.id WHERE s.purchase_date >= CURDATE() - INTERVAL 7 DAY")->fetchColumn() ?? 0
+        ) + (
+            pdo()->query("SELECT SUM(amount) FROM renewals WHERE renewal_date >= CURDATE() - INTERVAL 7 DAY")->fetchColumn() ?? 0
+        ),
+
+        'month' => (
+            pdo()->query("SELECT SUM(p.price) FROM services s JOIN plans p ON s.plan_id = p.id WHERE MONTH(s.purchase_date) = MONTH(CURDATE()) AND YEAR(s.purchase_date) = YEAR(CURDATE())")->fetchColumn() ?? 0
+        ) + (
+            pdo()->query("SELECT SUM(amount) FROM renewals WHERE MONTH(renewal_date) = MONTH(CURDATE()) AND YEAR(renewal_date) = YEAR(CURDATE())")->fetchColumn() ?? 0
+        ),
+
+        'year' => (
+            pdo()->query("SELECT SUM(p.price) FROM services s JOIN plans p ON s.plan_id = p.id WHERE YEAR(s.purchase_date) = YEAR(CURDATE())")->fetchColumn() ?? 0
+        ) + (
+            pdo()->query("SELECT SUM(amount) FROM renewals WHERE YEAR(renewal_date) = YEAR(CURDATE())")->fetchColumn() ?? 0
+        ),
     ];
     return $stats;
 }
@@ -1114,6 +1137,24 @@ function modifyPanelUser($username, $server_id, $data)
     }
 }
 
+function resetPanelUserUsage($username, $server_id)
+{
+    $stmt = pdo()->prepare("SELECT type FROM servers WHERE id = ?");
+    $stmt->execute([$server_id]);
+    $type = $stmt->fetchColumn();
+
+    switch ($type) {
+        case 'marzban':
+            return resetMarzbanUserUsage($username, $server_id);
+        case 'sanaei':
+            return resetSanaeiUserUsage($username, $server_id);
+        case 'marzneshin':
+            return resetMarzneshinUserUsage($username, $server_id);
+        default:
+            return false;
+    }
+}
+
 function showPlanEditor($chat_id, $message_id, $plan_id, $prompt = null)
 {
     $plan = getPlanById($plan_id);
@@ -1237,9 +1278,191 @@ function showPlansForCategoryAndServer($chat_id, $category_id, $server_id)
     // فرمت callback جدید برای کد تخفیف: apply_discount_code_{cat_ID}_{srv_ID}
     $keyboard_buttons[] = [['text' => '🎁 اعمال کد تخفیف', 'callback_data' => "apply_discount_code_{$category_id}_{$server_id}"]];
     // دکمه بازگشت به لیست سرورها برای همان دسته بندی
-    $keyboard_buttons[] = [['text' => '◀️ بازگشت به انتخاب سرور', 'callback_data' => 'cat_' . $category_id]];
+    // Check if only one server exists to adjust back button
+    $stmt_count = pdo()->prepare("
+        SELECT COUNT(DISTINCT s.id) 
+        FROM servers s
+        JOIN plans p ON s.id = p.server_id
+        WHERE p.category_id = ? AND p.status = 'active' AND s.status = 'active'
+    ");
+    $stmt_count->execute([$category_id]);
+    $server_count = $stmt_count->fetchColumn();
+
+    if ($server_count == 1) {
+        $keyboard_buttons[] = [['text' => '◀️ بازگشت به دسته‌بندی‌ها', 'callback_data' => 'back_to_categories']];
+    } else {
+        $keyboard_buttons[] = [['text' => '◀️ بازگشت به انتخاب سرور', 'callback_data' => 'cat_' . $category_id]];
+    }
     sendMessage($chat_id, $message, ['inline_keyboard' => $keyboard_buttons]);
 }
+
+// =====================================================================
+// ---              توابع جدید تمدید سرویس بر اساس پلن                ---
+// =====================================================================
+
+function applyPlanRenewal($chat_id, $username, $plan_id, $final_price)
+{
+    $plan = getPlanById($plan_id);
+    if (!$plan) {
+        return ['success' => false, 'message' => '❌ پلن یافت نشد.'];
+    }
+
+    // دریافت اطلاعات سرویس از دیتابیس
+    $stmt = pdo()->prepare("SELECT server_id FROM services WHERE owner_chat_id = ? AND marzban_username = ?");
+    $stmt->execute([$chat_id, $username]);
+    $server_id = $stmt->fetchColumn();
+
+    if (!$server_id) {
+        return ['success' => false, 'message' => 'سرویس در دیتابیس ربات یافت نشد.'];
+    }
+
+    // دریافت اطلاعات فعلی از پنل
+    $current_user_data = getPanelUser($username, $server_id);
+    if (!$current_user_data || isset($current_user_data['detail'])) {
+        return ['success' => false, 'message' => 'اطلاعات سرویس از پنل دریافت نشد.'];
+    }
+
+    $update_data = [];
+
+    // محاسبه زمان جدید: اگر سرویس فعال است، به زمان فعلی اضافه شود
+    $days_to_add = $plan['duration_days'];
+    $seconds_to_add = $days_to_add * 86400;
+    $current_expire = $current_user_data['expire'] ?? 0;
+
+    // اگر سرویس منقضی نشده و زمان دارد، به آن اضافه کن
+    if ($current_expire > 0 && $current_expire > time()) {
+        $new_expire = $current_expire + $seconds_to_add;
+    } else {
+        // سرویس منقضی شده، از همین الان شروع کن
+        $new_expire = time() + $seconds_to_add;
+    }
+    $update_data['expire'] = $new_expire;
+
+    // حجم جدید: حجم پلن جایگزین می‌شود
+    $new_volume_bytes = $plan['volume_gb'] * 1024 * 1024 * 1024;
+    $update_data['data_limit'] = $new_volume_bytes;
+
+    // اعمال تغییرات در پنل (زمان و حجم)
+    $result = modifyPanelUser($username, $server_id, $update_data);
+
+    if ($result && !isset($result['detail'])) {
+        // ریست کردن حجم مصرفی از طریق endpoint مخصوص
+        $reset_result = resetPanelUserUsage($username, $server_id);
+
+        // بروزرسانی دیتابیس محلی
+        pdo()->prepare("UPDATE services SET expire_timestamp = ?, volume_gb = ? WHERE marzban_username = ? AND server_id = ?")
+            ->execute([$new_expire, $plan['volume_gb'], $username, $server_id]);
+
+        // ثبت تمدید در جدول renewals برای محاسبه درآمد (commented out - optional)
+        // $stmt_renewal = pdo()->prepare("INSERT INTO renewals (user_id, service_username, plan_id, amount, renewal_date) VALUES (?, ?, ?, ?, NOW())");
+        // $stmt_renewal->execute([$chat_id, $username, $plan_id, $final_price]);
+
+        // کسر موجودی
+        updateUserBalance($chat_id, $final_price, 'deduct');
+
+        $user_data = getUserData($chat_id);
+        $new_balance = $user_data['balance'];
+
+        $success_msg = "✅ سرویس شما با موفقیت تمدید شد.\n\n" .
+            "📦 پلن: {$plan['name']}\n" .
+            "⏰ زمان اعتبار: {$days_to_add} روز\n" .
+            "📊 حجم جدید: {$plan['volume_gb']} گیگابایت\n\n" .
+            "💰 مبلغ " . number_format($final_price) . " تومان از حساب شما کسر گردید.\n" .
+            "موجودی جدید: " . number_format($new_balance) . " تومان.";
+
+        // نوتیفیکیشن برای ادمین
+        $admin_notification = "✅ <b>تمدید سرویس</b>\n\n" .
+            "👤 کاربر: <code>$chat_id</code>\n" .
+            "🔧 سرویس: <code>$username</code>\n" .
+            "📦 پلن: {$plan['name']}\n" .
+            "💳 مبلغ: " . number_format($final_price) . " تومان";
+
+        sendMessage(ADMIN_CHAT_ID, $admin_notification);
+
+        return ['success' => true, 'message' => $success_msg];
+    }
+
+    return ['success' => false, 'message' => 'خطا در ارتباط با پنل برای اعمال تغییرات.'];
+}
+
+function showServersForCategoryRenewal($chat_id, $category_id, $renewal_username)
+{
+    // مشابه showServersForCategory اما با callback_data متفاوت
+    $category_stmt = pdo()->prepare("SELECT name FROM categories WHERE id = ?");
+    $category_stmt->execute([$category_id]);
+    $category_name = $category_stmt->fetchColumn();
+
+    if (!$category_name) {
+        sendMessage($chat_id, "خطا: دسته‌بندی یافت نشد.");
+        return;
+    }
+
+    $stmt = pdo()->prepare("
+        SELECT DISTINCT s.id, s.name 
+        FROM servers s
+        JOIN plans p ON s.id = p.server_id
+        WHERE p.category_id = ? AND p.status = 'active' AND s.status = 'active'
+    ");
+    $stmt->execute([$category_id]);
+    $servers = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    if (empty($servers)) {
+        sendMessage($chat_id, "متاسفانه در حال حاضر هیچ سروری در این دسته‌بندی پلن فعال ندارد.");
+        return;
+    }
+
+    $message = "🔄 <b>تمدید سرویس - دسته‌بندی «{$category_name}»</b>\n\nلطفاً سرور (لوکیشن) مورد نظر خود را انتخاب کنید:";
+    $keyboard_buttons = [];
+    foreach ($servers as $server) {
+        $keyboard_buttons[] = [['text' => "🖥 {$server['name']}", 'callback_data' => "renewal_show_plans_cat_{$category_id}_srv_{$server['id']}"]];
+    }
+    $keyboard_buttons[] = [['text' => '◀️ بازگشت', 'callback_data' => "service_details_{$renewal_username}"]];
+    sendMessage($chat_id, $message, ['inline_keyboard' => $keyboard_buttons]);
+}
+
+function showPlansForCategoryAndServerRenewal($chat_id, $category_id, $server_id, $renewal_username)
+{
+    // مشابه showPlansForCategoryAndServer اما با callback_data متفاوت
+    $stmt = pdo()->prepare("SELECT * FROM plans WHERE category_id = ? AND server_id = ? AND status = 'active' AND is_test_plan = 0");
+    $stmt->execute([$category_id, $server_id]);
+    $plans = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    if (empty($plans)) {
+        sendMessage($chat_id, "هیچ پلن فعالی در این سرور و دسته‌بندی یافت نشد.");
+        return;
+    }
+
+    $user_balance = getUserData($chat_id)['balance'] ?? 0;
+    $message = "🔄 <b>تمدید سرویس - انتخاب پلن</b>\n\nموجودی شما: " . number_format($user_balance) . " تومان\n\nلطفاً پلن مورد نظر خود را انتخاب کنید:";
+    $keyboard_buttons = [];
+
+    foreach ($plans as $plan) {
+        $price_formatted = number_format($plan['price']);
+        $button_text = "📦 {$plan['name']} - {$price_formatted} تومان";
+        $keyboard_buttons[] = [['text' => $button_text, 'callback_data' => "renewal_buy_plan_{$plan['id']}"]];
+    }
+
+    // Check if only one server exists to adjust back button
+    $stmt_count = pdo()->prepare("
+        SELECT COUNT(DISTINCT s.id) 
+        FROM servers s
+        JOIN plans p ON s.id = p.server_id
+        WHERE p.category_id = ? AND p.status = 'active' AND s.status = 'active'
+    ");
+    $stmt_count->execute([$category_id]);
+    $server_count = $stmt_count->fetchColumn();
+
+    if ($server_count == 1) {
+        $keyboard_buttons[] = [['text' => '◀️ بازگشت', 'callback_data' => "renew_service_{$renewal_username}"]];
+    } else {
+        $keyboard_buttons[] = [['text' => '◀️ بازگشت', 'callback_data' => "renewal_cat_{$category_id}"]];
+    }
+    sendMessage($chat_id, $message, ['inline_keyboard' => $keyboard_buttons]);
+}
+
+// =====================================================================
+
+
 
 function applyRenewal($chat_id, $username, $days_to_add, $gb_to_add)
 {
@@ -1302,16 +1525,16 @@ function showRenewalManagementMenu($chat_id, $message_id = null)
 {
     $settings = getSettings();
     $status_icon = ($settings['renewal_status'] ?? 'off') == 'on' ? '✅' : '❌';
+    $status_text = $status_icon == '✅' ? '<b>فعال</b>' : '<b>غیرفعال</b>';
+
     $message = "<b>🔄 مدیریت تمدید سرویس</b>\n\n" .
-        "▫️ وضعیت کلی: " . ($status_icon == '✅' ? '<b>فعال</b>' : '<b>غیرفعال</b>') . "\n" .
-        "▫️ هزینه هر روز تمدید: <b>" . number_format($settings['renewal_price_per_day'] ?? 1000) . " تومان</b>\n" .
-        "▫️ هزینه هر گیگابایت تمدید: <b>" . number_format($settings['renewal_price_per_gb'] ?? 2000) . " تومان</b>";
+        "▫️ وضعیت کلی: " . $status_text . "\n\n" .
+        "📌 <b>توجه:</b> تمدید سرویس بر اساس انتخاب پلن انجام می‌شود.\n" .
+        "کاربران برای تمدید سرویس خود، یک پلن را انتخاب می‌کنند و قیمت آن پلن برای تمدید محاسبه می‌شود.";
 
     $keyboard = [
         'inline_keyboard' => [
             [['text' => $status_icon . ' فعال/غیرفعال کردن', 'callback_data' => 'toggle_renewal_status']],
-            [['text' => '💰 تنظیم قیمت روز', 'callback_data' => 'set_renewal_price_day']],
-            [['text' => '📊 تنظیم قیمت حجم', 'callback_data' => 'set_renewal_price_gb']],
             [['text' => '◀️ بازگشت به پنل', 'callback_data' => 'back_to_admin_panel']],
         ]
     ];

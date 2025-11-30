@@ -68,8 +68,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_settings'])) {
 
     // Renewal
     $settings_to_update['renewal_status'] = $_POST['renewal_status'] ?? 'off';
-    $settings_to_update['renewal_price_per_day'] = (int) ($_POST['renewal_price_per_day'] ?? 1000);
-    $settings_to_update['renewal_price_per_gb'] = (int) ($_POST['renewal_price_per_gb'] ?? 2000);
 
     saveSettings($settings_to_update);
     $success = 'تنظیمات با موفقیت ذخیره شد.';
@@ -93,11 +91,11 @@ renderHeader('تنظیمات');
         
         <div class="content-area">
             <?php if ($success): ?>
-                    <div class="alert alert-success">✅ <?php echo $success; ?></div>
+                        <div class="alert alert-success">✅ <?php echo $success; ?></div>
             <?php endif; ?>
             
             <?php if ($error): ?>
-                    <div class="alert alert-danger">❌ <?php echo $error; ?></div>
+                        <div class="alert alert-danger">❌ <?php echo $error; ?></div>
             <?php endif; ?>
             
             <form method="POST">
@@ -319,16 +317,6 @@ renderHeader('تنظیمات');
                                     <option value="on" <?php echo isset($settings['renewal_status']) && $settings['renewal_status'] === 'on' ? 'selected' : ''; ?>>✅ فعال</option>
                                     <option value="off" <?php echo !isset($settings['renewal_status']) || $settings['renewal_status'] === 'off' ? 'selected' : ''; ?>>❌ غیرفعال</option>
                                 </select>
-                            </div>
-                            
-                            <div class="form-group">
-                                <label>قیمت هر روز (تومان)</label>
-                                <input type="number" name="renewal_price_per_day" value="<?php echo $settings['renewal_price_per_day'] ?? 1000; ?>" min="0">
-                            </div>
-                            
-                            <div class="form-group">
-                                <label>قیمت هر گیگابایت (تومان)</label>
-                                <input type="number" name="renewal_price_per_gb" value="<?php echo $settings['renewal_price_per_gb'] ?? 2000; ?>" min="0">
                             </div>
                         </div>
                     </div>

@@ -22,6 +22,7 @@ $successMessages = [];
 // --- داده‌های فرم ---
 $bot_token = trim($_POST['bot_token'] ?? '');
 $admin_id = trim($_POST['admin_id'] ?? '');
+$domain_url = trim($_POST['domain_url'] ?? '');
 $web_username = trim($_POST['web_username'] ?? '');
 $web_password = trim($_POST['web_password'] ?? '');
 
@@ -183,6 +184,16 @@ if ($step === 2) {
         $errors[] = 'توکن ربات الزامی است.';
     if (empty($admin_id) || !is_numeric($admin_id))
         $errors[] = 'آیدی عددی ادمین الزامی و باید عدد باشد.';
+    if (empty($domain_url))
+        $errors[] = 'آدرس دامنه الزامی است.';
+
+    // حذف اسلش آخر از آدرس دامنه در صورت وجود
+    $domain_url = rtrim($domain_url, '/');
+
+    // بررسی فرمت URL
+    if (!empty($domain_url) && !filter_var($domain_url, FILTER_VALIDATE_URL)) {
+        $errors[] = 'فرمت آدرس دامنه صحیح نیست. باید با http:// یا https:// شروع شود.';
+    }
 
     // اگر username/password خالی بود، مقادیر پیش‌فرض تولید شود
     if (empty($web_username)) {
@@ -236,7 +247,8 @@ if ($step === 2) {
             $config_content .= "define('DB_PASS', '{$db_pass}');" . PHP_EOL . PHP_EOL;
             $config_content .= "define('BOT_TOKEN', '{$bot_token}');" . PHP_EOL;
             $config_content .= "define('ADMIN_CHAT_ID', {$admin_id});" . PHP_EOL;
-            $config_content .= "define('SECRET_TOKEN', '{$secretToken}');" . PHP_EOL . PHP_EOL;
+            $config_content .= "define('SECRET_TOKEN', '{$secretToken}');" . PHP_EOL;
+            $config_content .= "define('BASE_URL', '{$domain_url}');" . PHP_EOL . PHP_EOL;
             $config_content .= "// Web Panel Credentials" . PHP_EOL;
             $config_content .= "define('WEB_USERNAME', '{$web_username}');" . PHP_EOL;
             $config_content .= "define('WEB_PASSWORD_HASH', '{$web_password_hash}');" . PHP_EOL;
@@ -578,19 +590,17 @@ if ($step === 2) {
                 <div class="progress-line progress-line-fg <?php echo $install_complete_class; ?>"
                     style="width: <?php echo $progress_width; ?>;"></div>
 
-                <div
-                    class="step <?php if ($step > 1 || ($step == 3 && empty($errors)))
-                        echo 'completed';
-                    if ($step == 1)
-                        echo 'active'; ?>">
+                <div class="step <?php if ($step > 1 || ($step == 3 && empty($errors)))
+                    echo 'completed';
+                if ($step == 1)
+                    echo 'active'; ?>">
                     <div class="step-icon">۱</div>
                     <div class="step-label">اطلاعات ربات</div>
                 </div>
-                <div
-                    class="step <?php if ($step > 2 || ($step == 3 && empty($errors)))
-                        echo 'completed';
-                    if ($step == 2)
-                        echo 'active'; ?>">
+                <div class="step <?php if ($step > 2 || ($step == 3 && empty($errors)))
+                    echo 'completed';
+                if ($step == 2)
+                    echo 'active'; ?>">
                     <div class="step-icon">۲</div>
                     <div class="step-label">دیتابیس</div>
                 </div>
@@ -632,6 +642,12 @@ if ($step === 2) {
                                 value="<?php echo htmlspecialchars($admin_id); ?>" required>
                             <p class="example-text">مثال: 123456789</p>
                         </div>
+                        <div class="form-group">
+                            <label for="domain_url">آدرس دامنه (برای مینی اپ تلگرام)</label>
+                            <input type="text" id="domain_url" name="domain_url"
+                                value="<?php echo htmlspecialchars($domain_url); ?>" required>
+                            <p class="example-text">مثال: https://yourdomain.com (بدون اسلش آخر)</p>
+                        </div>
 
                         <div class="webhook-info" style="margin-top: 30px;">
                             <strong>🔐 اطلاعات ورود به پنل تحت وب (اختیاری)</strong>
@@ -661,6 +677,7 @@ if ($step === 2) {
                         <input type="hidden" name="step" value="3">
                         <input type="hidden" name="bot_token" value="<?php echo htmlspecialchars($bot_token); ?>">
                         <input type="hidden" name="admin_id" value="<?php echo htmlspecialchars($admin_id); ?>">
+                        <input type="hidden" name="domain_url" value="<?php echo htmlspecialchars($domain_url); ?>">
                         <input type="hidden" name="web_username" value="<?php echo htmlspecialchars($web_username); ?>">
                         <input type="hidden" name="web_password" value="<?php echo htmlspecialchars($web_password); ?>">
                         <div class="form-group">
