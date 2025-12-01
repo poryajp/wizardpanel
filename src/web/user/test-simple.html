@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>تست ساده - آیا فایل‌ها در دسترس هستند؟</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            text-align: center;
+            direction: rtl;
+        }
+
+        .success-box {
+            background: rgba(255, 255, 255, 0.9);
+            color: #2d3748;
+            padding: 40px;
+            border-radius: 16px;
+            max-width: 600px;
+            margin: 50px auto;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        h1 {
+            color: #48bb78;
+            font-size: 2.5rem;
+            margin-bottom: 20px;
+        }
+
+        .info {
+            background: #f7fafc;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            text-align: right;
+        }
+
+        .success-icon {
+            font-size: 80px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="success-box">
+        <div class="success-icon">✅</div>
+        <h1>عالی! فایل‌ها در دسترس هستند</h1>
+        <p style="font-size: 1.2rem; margin: 20px 0;">
+            اگر این پیام را می‌بینید، یعنی فایل‌های HTML شما در سرور به درستی کار می‌کنند.
+        </p>
+
+        <div class="info">
+            <h3>مرحله بعدی: تست PHP</h3>
+            <p>حالا باید فایل‌های PHP را تست کنید. لینک زیر را کلیک کنید:</p>
+            <a href="test-php.php"
+                style="display: inline-block; background: #4299e1; color: white; padding: 15px 30px; text-decoration: none; border-radius: 8px; margin: 10px; font-weight: bold;">
+                تست PHP
+            </a>
+        </div>
+
+        <div class="info">
+            <h3>اطلاعات مسیر</h3>
+            <p><strong>فایل جاری:</strong> test-simple.html</p>
+            <p><strong>مسیر انتظاری:</strong> /web/user/test-simple.html</p>
+            <p id="current-url"></p>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('current-url').innerHTML = '<strong>URL جاری:</strong> ' + window.location.href;
+    </script>
+</body>
+
+</html>

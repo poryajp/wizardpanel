@@ -323,6 +323,10 @@ if ($selected_cat_id && !$selected_server_id) {
             <i class="fas fa-wallet"></i>
             <span>کیف پول</span>
         </a>
+        <a href="support.php" class="nav-item">
+            <i class="fas fa-headset"></i>
+            <span>پشتیبانی</span>
+        </a>
     </div>
 
     <script src="assets/js/app.js"></script>

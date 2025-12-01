@@ -6,8 +6,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['initData'])) {
     $userData = validateTelegramWebAppData($_POST['initData']);
 
     if ($userData) {
-        $_SESSION['user_id'] = $userData['id'];
-        $_SESSION['first_name'] = $userData['first_name'] ?? 'کاربر';
+        // Use the new loginUser function which handles session regeneration
+        loginUser($userData['id'], $userData['first_name'] ?? 'کاربر');
 
         echo json_encode(['success' => true]);
         exit;
@@ -18,28 +18,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['initData'])) {
     }
 }
 
-// Require login for viewing the page
-requireUserLogin();
+// Check if user is logged in
+$isLoggedIn = isUserLoggedIn();
 
-$user = getCurrentUser();
-$services = getUserServices($user['chat_id']);
-
-// Calculate stats
-$total_services = count($services);
-$active_services = 0;
-$expired_services = 0;
-$now = time();
-
-foreach ($services as $service) {
-    if ($service['expire_timestamp'] < $now) {
-        $expired_services++;
-    } else {
-        $active_services++;
+// If logged in, get user data
+if ($isLoggedIn) {
+    $user = getCurrentUser();
+    $services = getUserServices($user['chat_id']);
+    
+    // Calculate stats
+    $total_services = count($services);
+    $active_services = 0;
+    $expired_services = 0;
+    $now = time();
+    
+    foreach ($services as $service) {
+        if ($service['expire_timestamp'] < $now) {
+            $expired_services++;
+        } else {
+            $active_services++;
+        }
     }
+    
+    // Get recent services (last 3)
+    $recent_services = array_slice($services, 0, 3);
+} else {
+    // Set defaults for non-logged users (will be handled by JS)
+    $user = ['first_name' => 'کاربر', 'chat_id' => 0, 'balance' => 0];
+    $services = [];
+    $total_services = 0;
+    $active_services = 0;
+    $expired_services = 0;
+    $recent_services = [];
 }
-
-// Get recent services (last 3)
-$recent_services = array_slice($services, 0, 3);
 ?>
 <!DOCTYPE html>
 <html lang="fa" dir="rtl">
@@ -57,11 +68,12 @@ $recent_services = array_slice($services, 0, 3);
 
 <body>
     <!-- Loading Overlay -->
-    <div id="loading" class="loading-overlay" style="display: none;">
+    <div id="loading" class="loading-overlay" style="display: <?php echo $isLoggedIn ? 'none' : 'flex'; ?>; justify-content: center; align-items: center; flex-direction: column;">
         <div class="spinner"></div>
+        <p style="margin-top: 20px; color: white;">در حال احراز هویت...</p>
     </div>
 
-    <div class="container">
+    <div class="container" style="<?php echo $isLoggedIn ? '' : 'display: none;'; ?>" id="main-content">
         <!-- Header -->
         <div class="header">
             <div class="user-profile">
@@ -155,7 +167,9 @@ $recent_services = array_slice($services, 0, 3);
                     </a>
                 </div>
                 <div style="padding: 12px;">
-                    <?php foreach ($recent_services as $service):
+                    <?php 
+                    $now = time();
+                    foreach ($recent_services as $service):
                         $is_expired = $service['expire_timestamp'] < $now;
                         $status_color = $is_expired ? 'var(--danger-color)' : 'var(--success-color)';
                         $status_icon = $is_expired ? 'fa-times-circle' : 'fa-check-circle';
@@ -182,7 +196,7 @@ $recent_services = array_slice($services, 0, 3);
                     <?php endforeach; ?>
                 </div>
             </div>
-        <?php else: ?>
+        <?php elseif ($isLoggedIn): ?>
             <div class="card">
                 <div style="text-align: center; padding: 40px 20px; color: var(--text-muted);">
                     <i class="fas fa-inbox" style="font-size: 48px; margin-bottom: 16px; opacity: 0.5;"></i>
@@ -226,11 +240,17 @@ $recent_services = array_slice($services, 0, 3);
         tg.ready();
         tg.expand();
 
-        // Check if we need to authenticate
-        if (!<?php echo isUserLoggedIn() ? 'true' : 'false'; ?>) {
-            // Try to authenticate with Telegram
+        // Server-side state
+        const isLoggedIn = <?php echo $isLoggedIn ? 'true' : 'false'; ?>;
+        const serverUserId = <?php echo $isLoggedIn && isset($_SESSION['user_id']) ? $_SESSION['user_id'] : 0; ?>;
+
+        // Function to handle authentication
+        function authenticate() {
             if (tg.initData) {
-                showLoading();
+                console.log('Authenticating...');
+                document.getElementById('loading').style.display = 'flex';
+                document.getElementById('main-content').style.display = 'none';
+
                 fetch('index.php', {
                     method: 'POST',
                     headers: {
@@ -238,22 +258,41 @@ $recent_services = array_slice($services, 0, 3);
                     },
                     body: 'initData=' + encodeURIComponent(tg.initData)
                 })
-                    .then(response => response.json())
-                    .then(data => {
-                        hideLoading();
-                        if (data.success) {
-                            window.location.reload();
-                        } else {
-                            tg.showAlert('خطا در احراز هویت. لطفاً دوباره تلاش کنید.');
-                        }
-                    })
-                    .catch(error => {
-                        hideLoading();
-                        console.error('Auth error:', error);
-                        tg.showAlert('خطا در ارتباط با سرور');
-                    });
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        console.log('Authentication successful, reloading...');
+                        window.location.reload();
+                    } else {
+                        document.getElementById('loading').innerHTML = '<div style="text-align: center; color: white;"><i class="fas fa-exclamation-triangle" style="font-size: 48px; margin-bottom: 16px;"></i><p>خطا در احراز هویت</p><p style="font-size: 0.9rem; margin-top: 8px;">لطفاً دوباره تلاش کنید</p></div>';
+                        console.error('Auth failed:', data.error);
+                    }
+                })
+                .catch(error => {
+                    document.getElementById('loading').innerHTML = '<div style="text-align: center; color: white;"><i class="fas fa-exclamation-triangle" style="font-size: 48px; margin-bottom: 16px;"></i><p>خطا در ارتباط با سرور</p><p style="font-size: 0.9rem; margin-top: 8px;">' + error.message + '</p></div>';
+                    console.error('Auth error:', error);
+                });
             } else {
-                tg.showAlert('لطفاً از طریق ربات تلگرام وارد شوید.');
+                document.getElementById('loading').innerHTML = '<div style="text-align: center; color: white;"><i class="fas fa-exclamation-triangle" style="font-size: 48px; margin-bottom: 16px;"></i><p>دسترسی از طریق تلگرام مجاز است</p><p style="font-size: 0.9rem; margin-top: 8px;">لطفاً از داخل ربات تلگرام وارد شوید</p></div>';
+                console.error('No initData available!');
+            }
+        }
+
+        // Main logic
+        if (!isLoggedIn) {
+            // Case 1: Not logged in at all -> Authenticate
+            authenticate();
+        } else {
+            // Case 2: Logged in, check if user matches
+            const telegramUserId = tg.initDataUnsafe?.user?.id;
+            
+            if (telegramUserId && serverUserId != telegramUserId) {
+                console.log('User mismatch detected (Server: ' + serverUserId + ', TG: ' + telegramUserId + '). Re-authenticating...');
+                authenticate();
+            } else {
+                // Case 3: Logged in and user matches (or can't verify) -> Show content
+                document.getElementById('main-content').style.display = 'block';
+                document.getElementById('loading').style.display = 'none';
             }
         }
 

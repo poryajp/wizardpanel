@@ -1,7 +1,9 @@
 <?php
-// فعال کردن نمایش خطاها برای دیباگ
+// غیرفعال کردن نمایش خطاها در خروجی برای جلوگیری از خراب شدن JSON
 error_reporting(E_ALL);
-ini_set('display_errors', 1);
+ini_set('display_errors', 0);
+ini_set('log_errors', 1);
+
 // لود فایل session اول (در همان پوشه)
 require_once __DIR__ . '/session.php';
 // لود کردن کاربر حاضر
@@ -22,6 +24,9 @@ if (!defined('ADMIN_CHAT_ID')) {
 }
 // Handle photo upload for card-to-card
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['receipt']) && isset($_POST['action']) && $_POST['action'] === 'upload_receipt') {
+    // پاک کردن بافر خروجی برای اطمینان از اینکه هیچ دیتای اضافی ارسال نمی‌شود
+    while (ob_get_level())
+        ob_end_clean();
     header('Content-Type: application/json');
     $amount = (int) $_POST['amount'];
     if ($amount < 1000) {
@@ -54,7 +59,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['receipt']) && isset(
         exit;
     }
     // Save photo - مسیر صحیح بر اساس ساختار جدید
-    $upload_dir = __DIR__ . '/../../uploads/receipts/';
+    $upload_dir = __DIR__ . '/uploads/receipts/';
     // Create directory if it doesn't exist
     if (!is_dir($upload_dir)) {
         if (!mkdir($upload_dir, 0777, true)) {
@@ -70,7 +75,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['receipt']) && isset(
     if (move_uploaded_file($file['tmp_name'], $filepath)) {
         // Make file readable
         chmod($filepath, 0644);
-        
+
         // Get all admins
         $admins = getAdmins() ?: [];
         $admins[ADMIN_CHAT_ID] = ['permissions' => ['manage_payment']]; // Add main admin
@@ -83,15 +88,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['receipt']) && isset(
         try {
             // Load Telegram functions - مسیر صحیح
             require_once __DIR__ . '/../../includes/functions.php';
-            $caption = "💳 درخواست شارژ کیف پول
-" .
-                "👤 کاربر: " . htmlspecialchars($user['first_name'] ?? 'ناشناس') . "
-" .
-                "🆔 شناسه: <code>{$user['chat_id']}</code>
-" .
+            $caption = "💳 درخواست شارژ کیف پول\n" .
+                "👤 کاربر: " . htmlspecialchars($user['first_name'] ?? 'ناشناس') . "\n" .
+                "🆔 شناسه: <code>{$user['chat_id']}</code>\n" .
                 "💰 مبلغ: " . number_format($amount) . " تومان";
             // Get all admins
-            
+
             $keyboard = [
                 'inline_keyboard' => [
                     [
@@ -126,8 +128,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['receipt']) && isset(
             if ($sent) {
                 echo json_encode(['success' => true, 'message' => 'رسید شما برای ادمین ارسال شد. پس از بررسی، کیف پول شما شارژ خواهد شد.']);
             } else {
-                $error_message = !empty($errors) ? implode("
-", $errors) : 'خطا در ارسال به ادمین‌ها';
+                $error_message = !empty($errors) ? implode("\n", $errors) : 'خطا در ارسال به ادمین‌ها';
                 echo json_encode(['success' => false, 'message' => 'رسید شما آپلود شد اما در ارسال به ادمین‌ها مشکلی پیش آمد. لطفاً با پشتیبانی تماس بگیرید.']);
             }
         } catch (Exception $e) {
@@ -147,6 +148,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['receipt']) && isset(
 ?>
 <!DOCTYPE html>
 <html lang="fa" dir="rtl">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -169,6 +171,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['receipt']) && isset(
             align-items: center;
             z-index: 9999;
         }
+
         .spinner {
             width: 50px;
             height: 50px;
@@ -177,23 +180,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['receipt']) && isset(
             border-radius: 50%;
             animation: spin 1s linear infinite;
         }
+
         @keyframes spin {
             0% {
                 transform: rotate(0deg);
             }
+
             100% {
                 transform: rotate(360deg);
             }
         }
+
         .dark-theme .loading-overlay {
             background: rgba(0, 0, 0, 0.8);
         }
+
         .dark-theme .spinner {
             border-color: #333;
             border-top-color: #764ba2;
         }
     </style>
 </head>
+
 <body>
     <div id="loading" class="loading-overlay" style="display: none;">
         <div class="spinner"></div>
@@ -484,4 +492,5 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['receipt']) && isset(
         });
     </script>
 </body>
+
 </html>

@@ -13,6 +13,11 @@ $user = getCurrentUser();
 $chat_id = $user['chat_id'];
 $settings = getSettings();
 
+// تعریف ثابت USER_INLINE_KEYBOARD برای جلوگیری از خطا
+if (!defined('USER_INLINE_KEYBOARD')) {
+    define('USER_INLINE_KEYBOARD', ($settings['inline_keyboard'] ?? 'on') === 'on');
+}
+
 // Check if renewal is enabled
 if (($settings['renewal_status'] ?? 'off') !== 'on') {
     die('<!DOCTYPE html><html lang="fa" dir="rtl"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>خطا</title><link rel="stylesheet" href="assets/css/style.css"></head><body><div class="container"><div class="card"><div style="text-align: center; padding: 20px; color: var(--danger-color);"><i class="fas fa-exclamation-circle" style="font-size: 48px; margin-bottom: 16px;"></i><p>قابلیت تمدید سرویس در حال حاضر غیرفعال است.</p><a href="services.php" class="btn btn-primary">بازگشت</a></div></div></div></body></html>');
@@ -207,17 +212,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['confirm_renewal'])) {
                 <div class="card-header">
                     <div class="card-title">انتخاب پلن</div>
                 </div>
-                
+
                 <div style="padding: 10px 10px 0 10px;">
                     <?php
                     $stmt_count = pdo()->prepare("SELECT COUNT(DISTINCT s.id) FROM servers s JOIN plans p ON s.id = p.server_id WHERE p.category_id = ? AND p.status = 'active' AND s.status = 'active' AND s.id IS NOT NULL");
                     $stmt_count->execute([$category_id]);
                     $server_count = $stmt_count->fetchColumn();
-                    
+
                     $back_link = ($server_count == 1) ? "?username=" . urlencode($username) : "?username=" . urlencode($username) . "&category_id=" . urlencode($category_id);
                     $back_text = ($server_count == 1) ? 'بازگشت به دسته‌بندی‌ها' : 'بازگشت به سرورها';
                     ?>
-                    <a href="<?php echo $back_link; ?>" style="text-decoration: none; color: var(--primary-color); font-size: 0.9rem;">
+                    <a href="<?php echo $back_link; ?>"
+                        style="text-decoration: none; color: var(--primary-color); font-size: 0.9rem;">
                         <i class="fas fa-chevron-right"></i> <?php echo $back_text; ?>
                     </a>
                 </div>
