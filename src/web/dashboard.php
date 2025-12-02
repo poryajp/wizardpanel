@@ -34,22 +34,20 @@ try {
     $stats['total_services'] = $stmt->fetchColumn();
 
     // Today income
-    $today_income = pdo()
-        ->query("SELECT SUM(p.price) FROM services s JOIN plans p ON s.plan_id = p.id WHERE DATE(s.purchase_date) = CURDATE()")
-        ->fetchColumn() ?? 0;
-    $stats['today_income'] = $today_income;
+    $stmt = pdo()->prepare("SELECT SUM(amount) FROM payment_requests WHERE status = 'approved' AND DATE(processed_at) = CURDATE()");
+    $stmt->execute();
+    $stats['today_income'] = $stmt->fetchColumn() ?: 0;
 
     // Month income
-    $month_income = pdo()
-        ->query("SELECT SUM(p.price) FROM services s JOIN plans p ON s.plan_id = p.id WHERE MONTH(s.purchase_date) = MONTH(CURDATE()) AND YEAR(s.purchase_date) = YEAR(CURDATE())")
-        ->fetchColumn() ?? 0;
-    $stats['month_income'] = $month_income;
+    $stmt = pdo()->prepare("SELECT SUM(amount) FROM payment_requests WHERE status = 'approved' AND MONTH(processed_at) = MONTH(CURDATE()) AND YEAR(processed_at) = YEAR(CURDATE())");
+    $stmt->execute();
+    $stats['month_income'] = $stmt->fetchColumn() ?: 0;
 
     // Total servers
     $stmt = pdo()->query("SELECT COUNT(*) FROM servers WHERE status = 'active'");
     $stats['total_servers'] = $stmt->fetchColumn();
 
-    // Pending payments - Handle if table doesn't exist
+    // Pending payments
     try {
         $stmt = pdo()->query("SELECT COUNT(*) FROM payment_requests WHERE status = 'pending'");
         $stats['pending_payments'] = $stmt->fetchColumn();

@@ -42,7 +42,37 @@ $stmt->execute([$now]);
 $stats['expired_services'] = $stmt->fetchColumn();
 
 // Income stats
-$income_stats = calculateIncomeStats();
+// Calculate income stats (using payment_requests for stability)
+$income_stats = [
+    'today' => 0,
+    'week' => 0,
+    'month' => 0,
+    'year' => 0
+];
+
+try {
+    // Today
+    $stmt = pdo()->prepare("SELECT SUM(amount) FROM payment_requests WHERE status = 'approved' AND DATE(processed_at) = CURDATE()");
+    $stmt->execute();
+    $income_stats['today'] = $stmt->fetchColumn() ?: 0;
+
+    // Week
+    $stmt = pdo()->prepare("SELECT SUM(amount) FROM payment_requests WHERE status = 'approved' AND YEARWEEK(processed_at, 1) = YEARWEEK(CURDATE(), 1)");
+    $stmt->execute();
+    $income_stats['week'] = $stmt->fetchColumn() ?: 0;
+
+    // Month
+    $stmt = pdo()->prepare("SELECT SUM(amount) FROM payment_requests WHERE status = 'approved' AND MONTH(processed_at) = MONTH(CURDATE()) AND YEAR(processed_at) = YEAR(CURDATE())");
+    $stmt->execute();
+    $income_stats['month'] = $stmt->fetchColumn() ?: 0;
+
+    // Year
+    $stmt = pdo()->prepare("SELECT SUM(amount) FROM payment_requests WHERE status = 'approved' AND YEAR(processed_at) = YEAR(CURDATE())");
+    $stmt->execute();
+    $income_stats['year'] = $stmt->fetchColumn() ?: 0;
+} catch (Exception $e) {
+    // Keep defaults
+}
 
 renderHeader('آمار و گزارشات');
 ?>
