@@ -455,6 +455,21 @@ download_project() {
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# GENERATE RANDOM PASSWORD/STRING
+# ═══════════════════════════════════════════════════════════════════════════════
+generate_random_password() {
+    local length=${1:-16}
+    # Generate a random alphanumeric password
+    tr -dc 'A-Za-z0-9' < /dev/urandom | head -c "$length"
+}
+
+generate_random_username() {
+    local prefix=${1:-"user"}
+    # Generate username with prefix and 6 random characters
+    echo "${prefix}$(tr -dc 'a-z0-9' < /dev/urandom | head -c 6)"
+}
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # USER INPUT
 # ═══════════════════════════════════════════════════════════════════════════════
 get_user_inputs() {
@@ -463,55 +478,50 @@ get_user_inputs() {
     echo ""
     echo -e "${PURPLE}╔═══════════════════════════════════════════════════════════════════════╗${NC}"
     echo -e "${PURPLE}║                    📝 ENTER YOUR CONFIGURATION                        ║${NC}"
+    echo -e "${PURPLE}║          (Leave empty to auto-generate secure values)                 ║${NC}"
     echo -e "${PURPLE}╚═══════════════════════════════════════════════════════════════════════╝${NC}"
     echo ""
     
     # MySQL Root Password
-    while true; do
-        echo -e "${CYAN}[1/6]${NC} ${WHITE}Enter MySQL Root Password:${NC}"
-        read -s MYSQL_ROOT_PASSWORD
-        echo
-        if [ -n "$MYSQL_ROOT_PASSWORD" ]; then
-            print_success "MySQL root password set"
-            break
-        else
-            print_error "Password cannot be empty!"
-        fi
-    done
+    echo -e "${CYAN}[1/6]${NC} ${WHITE}Enter MySQL Root Password (leave empty to auto-generate):${NC}"
+    read -s MYSQL_ROOT_PASSWORD
+    echo
+    if [ -z "$MYSQL_ROOT_PASSWORD" ]; then
+        MYSQL_ROOT_PASSWORD=$(generate_random_password 16)
+        print_success "MySQL root password auto-generated"
+    else
+        print_success "MySQL root password set"
+    fi
     
     print_separator
     
     # MySQL User
-    while true; do
-        echo -e "${CYAN}[2/6]${NC} ${WHITE}Enter MySQL Username:${NC}"
-        read MYSQL_USER
-        if [ -n "$MYSQL_USER" ]; then
-            print_success "MySQL username: $MYSQL_USER"
-            break
-        else
-            print_error "Username cannot be empty!"
-        fi
-    done
+    echo -e "${CYAN}[2/6]${NC} ${WHITE}Enter MySQL Username (leave empty to auto-generate):${NC}"
+    read MYSQL_USER
+    if [ -z "$MYSQL_USER" ]; then
+        MYSQL_USER=$(generate_random_username "dbuser")
+        print_success "MySQL username auto-generated: $MYSQL_USER"
+    else
+        print_success "MySQL username: $MYSQL_USER"
+    fi
     
     print_separator
     
     # MySQL Password
-    while true; do
-        echo -e "${CYAN}[3/6]${NC} ${WHITE}Enter MySQL User Password:${NC}"
-        read -s MYSQL_PASSWORD
-        echo
-        if [ -n "$MYSQL_PASSWORD" ]; then
-            print_success "MySQL user password set"
-            break
-        else
-            print_error "Password cannot be empty!"
-        fi
-    done
+    echo -e "${CYAN}[3/6]${NC} ${WHITE}Enter MySQL User Password (leave empty to auto-generate):${NC}"
+    read -s MYSQL_PASSWORD
+    echo
+    if [ -z "$MYSQL_PASSWORD" ]; then
+        MYSQL_PASSWORD=$(generate_random_password 16)
+        print_success "MySQL user password auto-generated"
+    else
+        print_success "MySQL user password set"
+    fi
     
     print_separator
     
     # WordPress Port
-    echo -e "${CYAN}[4/6]${NC} ${WHITE}Enter WordPress/Panel Port (default: 80):${NC}"
+    echo -e "${CYAN}[4/6]${NC} ${WHITE}Enter WP/Panel Port (default: 80):${NC}"
     read WP_PORT
     WP_PORT=${WP_PORT:-80}
     
@@ -520,36 +530,32 @@ get_user_inputs() {
         print_warning "Invalid port number. Using default: 80"
         WP_PORT=80
     fi
-    print_success "WordPress port: $WP_PORT"
+    print_success "WP port: $WP_PORT"
     
     print_separator
     
     # OLS Admin User
-    while true; do
-        echo -e "${CYAN}[5/6]${NC} ${WHITE}Enter OpenLiteSpeed Admin Username:${NC}"
-        read LSWS_ADMIN_USER
-        if [ -n "$LSWS_ADMIN_USER" ]; then
-            print_success "OLS admin username: $LSWS_ADMIN_USER"
-            break
-        else
-            print_error "Username cannot be empty!"
-        fi
-    done
+    echo -e "${CYAN}[5/6]${NC} ${WHITE}Enter OpenLiteSpeed Admin Username (leave empty to auto-generate):${NC}"
+    read LSWS_ADMIN_USER
+    if [ -z "$LSWS_ADMIN_USER" ]; then
+        LSWS_ADMIN_USER=$(generate_random_username "admin")
+        print_success "OLS admin username auto-generated: $LSWS_ADMIN_USER"
+    else
+        print_success "OLS admin username: $LSWS_ADMIN_USER"
+    fi
     
     print_separator
     
     # OLS Admin Password
-    while true; do
-        echo -e "${CYAN}[6/6]${NC} ${WHITE}Enter OpenLiteSpeed Admin Password:${NC}"
-        read -s LSWS_ADMIN_PASS
-        echo
-        if [ -n "$LSWS_ADMIN_PASS" ]; then
-            print_success "OLS admin password set"
-            break
-        else
-            print_error "Password cannot be empty!"
-        fi
-    done
+    echo -e "${CYAN}[6/6]${NC} ${WHITE}Enter OpenLiteSpeed Admin Password (leave empty to auto-generate):${NC}"
+    read -s LSWS_ADMIN_PASS
+    echo
+    if [ -z "$LSWS_ADMIN_PASS" ]; then
+        LSWS_ADMIN_PASS=$(generate_random_password 16)
+        print_success "OLS admin password auto-generated"
+    else
+        print_success "OLS admin password set"
+    fi
     
     echo ""
     print_success "All configuration settings saved!"
