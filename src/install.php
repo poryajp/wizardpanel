@@ -14,6 +14,7 @@ ini_set('display_errors', 0);
 // --- متغیرهای اولیه ---
 $configFile = __DIR__ . '/includes/config.php';
 $botFileUrl = 'https://' . $_SERVER['HTTP_HOST'] . rtrim(dirname($_SERVER['PHP_SELF']), '/') . '/bot.php';
+$defaultDomainUrl = 'https://' . $_SERVER['HTTP_HOST'];
 
 $step = isset($_POST['step']) ? (int) $_POST['step'] : 1;
 $errors = [];
@@ -184,8 +185,9 @@ if ($step === 2) {
         $errors[] = 'توکن ربات الزامی است.';
     if (empty($admin_id) || !is_numeric($admin_id))
         $errors[] = 'آیدی عددی ادمین الزامی و باید عدد باشد.';
+    // اگر آدرس دامنه خالی بود، از آدرس جاری استفاده شود
     if (empty($domain_url))
-        $errors[] = 'آدرس دامنه الزامی است.';
+        $domain_url = $defaultDomainUrl;
 
     // حذف اسلش آخر از آدرس دامنه در صورت وجود
     $domain_url = rtrim($domain_url, '/');
@@ -645,8 +647,10 @@ if ($step === 2) {
                         <div class="form-group">
                             <label for="domain_url">آدرس دامنه (برای مینی اپ تلگرام)</label>
                             <input type="text" id="domain_url" name="domain_url"
-                                value="<?php echo htmlspecialchars($domain_url); ?>" required>
-                            <p class="example-text">مثال: https://yourdomain.com (بدون اسلش آخر)</p>
+                                value="<?php echo htmlspecialchars($domain_url ?: $defaultDomainUrl); ?>"
+                                placeholder="<?php echo htmlspecialchars($defaultDomainUrl); ?>">
+                            <p class="example-text">مثال: https://yourdomain.com (بدون اسلش آخر) - در صورت خالی بودن، آدرس
+                                فعلی استفاده می‌شود</p>
                         </div>
 
                         <div class="webhook-info" style="margin-top: 30px;">
