@@ -88,6 +88,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     <link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css" rel="stylesheet"
         type="text/css" />
     <link rel="stylesheet" href="assets/css/style.css">
+    <script src="assets/js/theme.js"></script>
 </head>
 
 <body>
@@ -103,6 +104,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 </a>
                 <h2 style="margin-right: 12px;">پشتیبانی</h2>
             </div>
+            <button class="theme-toggle" onclick="ThemeManager.toggle()" aria-label="تغییر تم">
+                <i class="fas fa-moon"></i>
+                <i class="fas fa-sun"></i>
+            </button>
         </div>
 
         <!-- Contact Info Card -->
@@ -262,10 +267,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 });
         }
 
-        // Theme
-        if (tg.colorScheme === 'dark') {
-            document.body.classList.add('dark-theme');
-        }
+        // Theme is now handled by theme.js automatically
     </script>
 </body>
 

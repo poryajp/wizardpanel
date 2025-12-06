@@ -25,13 +25,13 @@ $isLoggedIn = isUserLoggedIn();
 if ($isLoggedIn) {
     $user = getCurrentUser();
     $services = getUserServices($user['chat_id']);
-    
+
     // Calculate stats
     $total_services = count($services);
     $active_services = 0;
     $expired_services = 0;
     $now = time();
-    
+
     foreach ($services as $service) {
         if ($service['expire_timestamp'] < $now) {
             $expired_services++;
@@ -39,7 +39,7 @@ if ($isLoggedIn) {
             $active_services++;
         }
     }
-    
+
     // Get recent services (last 3)
     $recent_services = array_slice($services, 0, 3);
 } else {
@@ -64,11 +64,13 @@ if ($isLoggedIn) {
     <link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css" rel="stylesheet"
         type="text/css" />
     <link rel="stylesheet" href="assets/css/style.css">
+    <script src="assets/js/theme.js"></script>
 </head>
 
 <body>
     <!-- Loading Overlay -->
-    <div id="loading" class="loading-overlay" style="display: <?php echo $isLoggedIn ? 'none' : 'flex'; ?>; justify-content: center; align-items: center; flex-direction: column;">
+    <div id="loading" class="loading-overlay"
+        style="display: <?php echo $isLoggedIn ? 'none' : 'flex'; ?>; justify-content: center; align-items: center; flex-direction: column;">
         <div class="spinner"></div>
         <p style="margin-top: 20px; color: white;">در حال احراز هویت...</p>
     </div>
@@ -79,6 +81,10 @@ if ($isLoggedIn) {
             <div class="user-profile">
                 <h2><i class="fas fa-home"></i> خانه</h2>
             </div>
+            <button class="theme-toggle" onclick="ThemeManager.toggle()" aria-label="تغییر تم">
+                <i class="fas fa-moon"></i>
+                <i class="fas fa-sun"></i>
+            </button>
         </div>
 
         <!-- User Info Card -->
@@ -167,7 +173,7 @@ if ($isLoggedIn) {
                     </a>
                 </div>
                 <div style="padding: 12px;">
-                    <?php 
+                    <?php
                     $now = time();
                     foreach ($recent_services as $service):
                         $is_expired = $service['expire_timestamp'] < $now;
@@ -258,20 +264,20 @@ if ($isLoggedIn) {
                     },
                     body: 'initData=' + encodeURIComponent(tg.initData)
                 })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        console.log('Authentication successful, reloading...');
-                        window.location.reload();
-                    } else {
-                        document.getElementById('loading').innerHTML = '<div style="text-align: center; color: white;"><i class="fas fa-exclamation-triangle" style="font-size: 48px; margin-bottom: 16px;"></i><p>خطا در احراز هویت</p><p style="font-size: 0.9rem; margin-top: 8px;">لطفاً دوباره تلاش کنید</p></div>';
-                        console.error('Auth failed:', data.error);
-                    }
-                })
-                .catch(error => {
-                    document.getElementById('loading').innerHTML = '<div style="text-align: center; color: white;"><i class="fas fa-exclamation-triangle" style="font-size: 48px; margin-bottom: 16px;"></i><p>خطا در ارتباط با سرور</p><p style="font-size: 0.9rem; margin-top: 8px;">' + error.message + '</p></div>';
-                    console.error('Auth error:', error);
-                });
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            console.log('Authentication successful, reloading...');
+                            window.location.reload();
+                        } else {
+                            document.getElementById('loading').innerHTML = '<div style="text-align: center; color: white;"><i class="fas fa-exclamation-triangle" style="font-size: 48px; margin-bottom: 16px;"></i><p>خطا در احراز هویت</p><p style="font-size: 0.9rem; margin-top: 8px;">لطفاً دوباره تلاش کنید</p></div>';
+                            console.error('Auth failed:', data.error);
+                        }
+                    })
+                    .catch(error => {
+                        document.getElementById('loading').innerHTML = '<div style="text-align: center; color: white;"><i class="fas fa-exclamation-triangle" style="font-size: 48px; margin-bottom: 16px;"></i><p>خطا در ارتباط با سرور</p><p style="font-size: 0.9rem; margin-top: 8px;">' + error.message + '</p></div>';
+                        console.error('Auth error:', error);
+                    });
             } else {
                 document.getElementById('loading').innerHTML = '<div style="text-align: center; color: white;"><i class="fas fa-exclamation-triangle" style="font-size: 48px; margin-bottom: 16px;"></i><p>دسترسی از طریق تلگرام مجاز است</p><p style="font-size: 0.9rem; margin-top: 8px;">لطفاً از داخل ربات تلگرام وارد شوید</p></div>';
                 console.error('No initData available!');
@@ -285,7 +291,7 @@ if ($isLoggedIn) {
         } else {
             // Case 2: Logged in, check if user matches
             const telegramUserId = tg.initDataUnsafe?.user?.id;
-            
+
             if (telegramUserId && serverUserId != telegramUserId) {
                 console.log('User mismatch detected (Server: ' + serverUserId + ', TG: ' + telegramUserId + '). Re-authenticating...');
                 authenticate();
@@ -296,10 +302,7 @@ if ($isLoggedIn) {
             }
         }
 
-        // Set theme
-        if (tg.colorScheme === 'dark') {
-            document.body.classList.add('dark-theme');
-        }
+        // Theme is now handled by theme.js automatically
     </script>
 </body>
 

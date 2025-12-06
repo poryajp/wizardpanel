@@ -200,6 +200,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['receipt']) && isset(
             border-top-color: #764ba2;
         }
     </style>
+    <script src="assets/js/theme.js"></script>
 </head>
 
 <body>
@@ -214,6 +215,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['receipt']) && isset(
                 </a>
                 <h2 style="margin-right: 12px;">کیف پول</h2>
             </div>
+            <button class="theme-toggle" onclick="ThemeManager.toggle()" aria-label="تغییر تم">
+                <i class="fas fa-moon"></i>
+                <i class="fas fa-sun"></i>
+            </button>
         </div>
         <div class="card"
             style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; margin-bottom: 16px;">
@@ -482,10 +487,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['receipt']) && isset(
         function hideLoading() {
             document.getElementById('loading').style.display = 'none';
         }
-        // Handle dark mode
-        if (tg.colorScheme === 'dark') {
-            document.body.classList.add('dark-theme');
-        }
+        // Theme is now handled by theme.js automatically
         // Handle offline status
         window.addEventListener('offline', () => {
             tg.showAlert('اتصال اینترنت شما قطع شده است. لطفاً اتصال را بررسی کنید.');

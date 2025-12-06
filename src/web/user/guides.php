@@ -17,6 +17,7 @@ $guides = pdo()->query("SELECT * FROM guides WHERE status = 'active' ORDER BY id
     <link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css" rel="stylesheet"
         type="text/css" />
     <link rel="stylesheet" href="assets/css/style.css">
+    <script src="assets/js/theme.js"></script>
 </head>
 
 <body>
@@ -28,6 +29,10 @@ $guides = pdo()->query("SELECT * FROM guides WHERE status = 'active' ORDER BY id
                 </a>
                 <h2 style="margin-right: 12px;">راهنماها</h2>
             </div>
+            <button class="theme-toggle" onclick="ThemeManager.toggle()" aria-label="تغییر تم">
+                <i class="fas fa-moon"></i>
+                <i class="fas fa-sun"></i>
+            </button>
         </div>
 
         <?php if (empty($guides)): ?>
@@ -106,10 +111,7 @@ $guides = pdo()->query("SELECT * FROM guides WHERE status = 'active' ORDER BY id
             document.getElementById('guide-modal').style.display = 'none';
         }
 
-        // Theme
-        if (tg.colorScheme === 'dark') {
-            document.body.classList.add('dark-theme');
-        }
+        // Theme is now handled by theme.js automatically
     </script>
 </body>
 

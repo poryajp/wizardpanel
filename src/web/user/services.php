@@ -29,6 +29,7 @@ usort($services, function ($a, $b) {
     <link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css" rel="stylesheet"
         type="text/css" />
     <link rel="stylesheet" href="assets/css/style.css">
+    <script src="assets/js/theme.js"></script>
 </head>
 
 <body>
@@ -40,6 +41,10 @@ usort($services, function ($a, $b) {
                 </a>
                 <h2 style="margin-right: 12px;">سرویس‌های من</h2>
             </div>
+            <button class="theme-toggle" onclick="ThemeManager.toggle()" aria-label="تغییر تم">
+                <i class="fas fa-moon"></i>
+                <i class="fas fa-sun"></i>
+            </button>
         </div>
 
         <?php if (empty($services)): ?>
@@ -243,10 +248,7 @@ usort($services, function ($a, $b) {
             tg.showAlert('صفحه جزئیات در حال توسعه است');
         }
 
-        // Theme
-        if (tg.colorScheme === 'dark') {
-            document.body.classList.add('dark-theme');
-        }
+        // Theme is now handled by theme.js automatically
 
         // Check for success message in URL
         const urlParams = new URLSearchParams(window.location.search);

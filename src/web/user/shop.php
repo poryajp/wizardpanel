@@ -138,6 +138,7 @@ if ($selected_cat_id && !$selected_server_id) {
     <link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css" rel="stylesheet"
         type="text/css" />
     <link rel="stylesheet" href="assets/css/style.css">
+    <script src="assets/js/theme.js"></script>
 </head>
 
 <body>
@@ -153,10 +154,16 @@ if ($selected_cat_id && !$selected_server_id) {
                 </a>
                 <h2 style="margin-right: 12px;">فروشگاه</h2>
             </div>
-            <div class="wallet-badge">
-                <span class="text-success">
-                    <i class="fas fa-wallet"></i> <?php echo number_format($user['balance']); ?> تومان
-                </span>
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <button class="theme-toggle" onclick="ThemeManager.toggle()" aria-label="تغییر تم">
+                    <i class="fas fa-moon"></i>
+                    <i class="fas fa-sun"></i>
+                </button>
+                <div class="wallet-badge">
+                    <span class="text-success">
+                        <i class="fas fa-wallet"></i> <?php echo number_format($user['balance']); ?> تومان
+                    </span>
+                </div>
             </div>
         </div>
 
@@ -447,10 +454,7 @@ if ($selected_cat_id && !$selected_server_id) {
         tg.ready();
         tg.expand();
 
-        // Theme
-        if (tg.colorScheme === 'dark') {
-            document.body.classList.add('dark-theme');
-        }
+        // Theme is now handled by theme.js automatically
 
         let selectedPlanId = null;
         let testPlanData = null;

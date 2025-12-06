@@ -2,6 +2,7 @@
     --primary-color: #3b82f6;
     --primary-dark: #2563eb;
     --bg-color: #f3f4f6;
+    --bg-secondary: #e5e7eb;
     --card-bg: #ffffff;
     --text-color: #1f2937;
     --text-muted: #6b7280;
@@ -13,12 +14,79 @@
     --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
 }
 
-[data-theme="dark"] {
-    --bg-color: #111827;
-    --card-bg: #1f2937;
-    --text-color: #f9fafb;
-    --text-muted: #9ca3af;
-    --border-color: #374151;
+/* Dark Mode - triggered by .dark-mode class or data-theme attribute */
+.dark-mode,
+[data-theme="dark"],
+body.dark-theme {
+    --bg-color: #0f172a;
+    --bg-secondary: #1e293b;
+    --card-bg: #1e293b;
+    --text-color: #f1f5f9;
+    --text-muted: #94a3b8;
+    --border-color: #334155;
+    --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2);
+}
+
+/* Smooth theme transition */
+body,
+.card,
+.bottom-nav,
+.btn,
+input,
+textarea {
+    transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+/* Theme Toggle Button */
+.theme-toggle {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    border: 1px solid var(--border-color);
+    background: transparent;
+    color: var(--text-color);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+    transition: all 0.3s ease;
+}
+
+.theme-toggle:hover {
+    transform: scale(1.05);
+    background: var(--bg-secondary);
+}
+
+.theme-toggle:active {
+    transform: scale(0.95);
+}
+
+.theme-toggle .fa-sun {
+    display: none;
+    color: #fbbf24;
+}
+
+.theme-toggle .fa-moon {
+    display: inline-block;
+    color: #6366f1;
+}
+
+.dark-mode .theme-toggle,
+body.dark-theme .theme-toggle {
+    border-color: var(--border-color);
+    background: transparent;
+}
+
+.dark-mode .theme-toggle .fa-sun,
+body.dark-theme .theme-toggle .fa-sun {
+    display: inline-block;
+    color: #ffffff;
+}
+
+.dark-mode .theme-toggle .fa-moon,
+body.dark-theme .theme-toggle .fa-moon {
+    display: none;
 }
 
 * {
